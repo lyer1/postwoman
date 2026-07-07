@@ -2,9 +2,11 @@
 import { useStore } from '../store/useStore';
 import clsx from 'clsx';
 import { useState } from 'react';
+import { Rocket } from 'lucide-react';
 
 export default function ResponsePane() {
   const { tabs, activeTabId } = useStore();
+  const [tab, setTab] = useState<'Body' | 'Cookies' | 'Headers' | 'Test Results'>('Body');
   const [view, setView] = useState<'Pretty' | 'Raw'>('Pretty');
   
   if (!activeTabId || !tabs[activeTabId]) return null;
@@ -12,9 +14,13 @@ export default function ResponsePane() {
 
   if (!req.response) {
     return (
-      <div className="flex flex-col h-full bg-white dark:bg-[#0d0d0d] border-t border-gray-200 dark:border-gray-800 p-4">
-        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
-          Enter the URL and click Send to get a response
+      <div className="flex flex-col h-full bg-[#1C1C1C] p-4 text-[#e5e2e1]">
+        <div className="flex space-x-6 border-b border-[#333333] mb-4 text-sm font-semibold">
+          <div className="pb-2 px-1 text-gray-500">Response</div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-500 text-sm">
+          <Rocket size={48} className="mb-4 text-[#FF6C37] opacity-80" strokeWidth={1} />
+          <p>Click Send to get a response</p>
         </div>
       </div>
     );
@@ -23,35 +29,59 @@ export default function ResponsePane() {
   const { status, time, size, headers, body, error } = req.response;
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[#0d0d0d] border-t border-gray-200 dark:border-gray-800 flex-1">
-      <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex space-x-4">
-          <button onClick={() => setView('Pretty')} className={clsx("text-sm font-medium px-2 py-1 rounded", view === 'Pretty' ? "bg-gray-100 dark:bg-gray-800 text-black dark:text-white" : "text-gray-500 hover:text-black dark:hover:text-white")}>Pretty</button>
-          <button onClick={() => setView('Raw')} className={clsx("text-sm font-medium px-2 py-1 rounded", view === 'Raw' ? "bg-gray-100 dark:bg-gray-800 text-black dark:text-white" : "text-gray-500 hover:text-black dark:hover:text-white")}>Raw</button>
+    <div className="flex flex-col h-full bg-[#1C1C1C] flex-1 text-[#e5e2e1] px-4 pt-4">
+      <div className="flex items-center justify-between border-b border-[#333333] mb-2">
+        <div className="flex space-x-6 text-sm font-semibold">
+          {['Body', 'Cookies', 'Headers', 'Test Results'].map(t => (
+            <button 
+              key={t}
+              onClick={() => setTab(t as any)}
+              className={clsx("pb-2 px-1 relative text-[#e5e2e1]", tab === t ? "" : "text-gray-500 hover:text-gray-300")}
+            >
+              {t}
+              {tab === t && <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#FF6C37]" />}
+            </button>
+          ))}
         </div>
         
         {error ? (
-          <div className="text-red-500 text-sm font-semibold flex space-x-3">
-            <span>Error</span>
+          <div className="text-[#ffb4ab] text-xs font-semibold mb-2">
+            Error
           </div>
         ) : (
-          <div className="flex space-x-4 text-xs font-semibold text-gray-600 dark:text-gray-400">
-            <span>Status: <span className={clsx(status >= 200 && status < 300 ? "text-green-500" : "text-red-500")}>{status}</span></span>
-            <span>Time: <span className="text-green-500">{time} ms</span></span>
-            <span>Size: <span className="text-green-500">{size} B</span></span>
+          <div className="flex space-x-4 text-xs mb-2">
+            <span className="text-gray-400">Status: <span className={clsx(status >= 200 && status < 300 ? "text-green-500" : "text-red-500", "font-semibold")}>{status}</span></span>
+            <span className="text-gray-400">Time: <span className="text-green-500 font-semibold">{time} ms</span></span>
+            <span className="text-gray-400">Size: <span className="text-green-500 font-semibold">{size} B</span></span>
           </div>
         )}
       </div>
       
-      <div className="flex-1 overflow-auto p-4 bg-gray-50 dark:bg-[#151515] text-sm font-mono text-gray-800 dark:text-gray-300">
-        {error ? (
-          <div className="text-red-500">{error}</div>
-        ) : (
-          <pre className="whitespace-pre-wrap break-all">
-            {view === 'Pretty' ? (typeof body === 'object' ? JSON.stringify(body, null, 2) : body) : (typeof body === 'object' ? JSON.stringify(body) : body)}
-          </pre>
-        )}
-      </div>
+      {tab === 'Body' && (
+        <div className="flex flex-col h-full overflow-hidden">
+          {!error && (
+            <div className="flex space-x-2 mb-2">
+              <button onClick={() => setView('Pretty')} className={clsx("text-xs font-medium px-2 py-1 rounded", view === 'Pretty' ? "bg-[#2A2A2A] text-white" : "text-gray-500 hover:text-white")}>Pretty</button>
+              <button onClick={() => setView('Raw')} className={clsx("text-xs font-medium px-2 py-1 rounded", view === 'Raw' ? "bg-[#2A2A2A] text-white" : "text-gray-500 hover:text-white")}>Raw</button>
+            </div>
+          )}
+          <div className="flex-1 overflow-auto bg-[#131313] border border-[#333333] p-2 text-sm font-[JetBrains_Mono] text-gray-300 rounded">
+            {error ? (
+              <div className="text-[#ffb4ab]">{error}</div>
+            ) : (
+              <pre className="whitespace-pre-wrap break-all">
+                {view === 'Pretty' ? (typeof body === 'object' ? JSON.stringify(body, null, 2) : body) : (typeof body === 'object' ? JSON.stringify(body) : body)}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab !== 'Body' && (
+        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+          {tab} (Coming Soon)
+        </div>
+      )}
     </div>
   );
 }

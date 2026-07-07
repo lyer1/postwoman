@@ -237,6 +237,18 @@ def create_environment(env: Environment, session: Session = Depends(get_session)
     session.refresh(env)
     return env
 
+@app.put("/api/environments/{env_id}")
+def update_environment(env_id: int, env_data: Environment, session: Session = Depends(get_session)):
+    env = session.get(Environment, env_id)
+    if not env:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    env.name = env_data.name
+    env.variables = env_data.variables
+    session.add(env)
+    session.commit()
+    session.refresh(env)
+    return env
+
 @app.delete("/api/environments/{env_id}")
 def delete_environment(env_id: int, session: Session = Depends(get_session)):
     env = session.get(Environment, env_id)

@@ -1,17 +1,21 @@
 'use client';
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Folder, Plus, ChevronRight, MoreVertical } from 'lucide-react';
+import { Search, Folder, MoreVertical, Plus, ChevronRight, Check } from 'lucide-react';
 import clsx from 'clsx';
+import KeyValTable from './KeyValTable';
+import { KeyVal } from '../store/useStore';
 
 export default function Sidebar() {
-  const [activeTab, setActiveTab] = useState<'collections' | 'history'>('collections');
+  const { collections, setCollections, history, addTab, tabs, environments, setEnvironments, activeEnvironmentId, setActiveEnvironmentId, activeSidebarTab } = useStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newColName, setNewColName] = useState('');
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [editingColId, setEditingColId] = useState<number | null>(null);
   const [editColName, setEditColName] = useState('');
-  const { collections, setCollections, history, addTab } = useStore();
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
 
   const handleCreateCollection = async () => {
     if (!newColName) return;
@@ -45,8 +49,6 @@ export default function Sidebar() {
     }
   };
 
-  const [isRenaming, setIsRenaming] = useState(false);
-
   const handleRenameCollection = async (id: number) => {
     if (!editColName || isRenaming) {
       setEditingColId(null);
@@ -70,175 +72,335 @@ export default function Sidebar() {
     setIsRenaming(false);
   };
 
+  const handleCreateEnvironment = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/environments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'New Environment' })
+      });
+      if (res.ok) {
+        const newEnv = await res.json();
+        const data = await fetch('http://127.0.0.1:8000/api/environments').then(r => r.json());
+        setEnvironments(data);
+        addTab(`env-${newEnv.id}`, { type: 'environment', envId: newEnv.id, name: newEnv.name, envVars: [] });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteEnvironment = async (e: React.MouseEvent, envId: number) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/environments/${envId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setEnvironments(environments.filter(e => e.id !== envId));
+        if (activeEnvironmentId === envId.toString()) {
+          useStore.getState().setActiveEnvironmentId(null);
+        }
+      }
+    } catch(e) { console.error(e); }
+  };
+
+
+
+  const renderContent = () => {
+    if (activeSidebarTab === 'collections') {
+      const filteredCols = collections.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      return (
+        <div>
+          <div className="flex items-center justify-between px-2 py-1 mb-2 group">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">My Workspace</span>
+          </div>
+          
+          {showAddModal && (
+            <div className="px-2 mb-2">
+              <input 
+                type="text"
+                autoFocus
+                className="w-full p-1.5 text-sm border border-[#333333] bg-[#0d0d0d] rounded outline-none focus:border-[#FF6C37] mb-1 text-white"
+                placeholder="Collection Name"
+                value={newColName}
+                onChange={e => setNewColName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreateCollection()}
+                data-testid="add-collection-input"
+              />
+              <div className="flex space-x-1">
+                <button onClick={handleCreateCollection} className="flex-1 bg-[#FF6C37] text-white text-xs py-1 rounded" data-testid="save-collection-btn">Save</button>
+                <button onClick={() => setShowAddModal(false)} className="flex-1 bg-[#333333] text-white text-xs py-1 rounded">Cancel</button>
+              </div>
+            </div>
+          )}
+          {filteredCols.length === 0 ? (
+            <div className="text-sm text-gray-500 px-2">No collections found.</div>
+          ) : (
+            filteredCols.map(col => (
+              <div key={col.id} className="mb-1">
+                {editingColId === col.id ? (
+                  <div className="px-2 py-1">
+                    <input 
+                      autoFocus
+                      className="w-full p-1 text-sm bg-[#0d0d0d] border border-[#FF6C37] rounded outline-none text-white"
+                      value={editColName}
+                      onChange={e => setEditColName(e.target.value)}
+                      onBlur={() => handleRenameCollection(col.id)}
+                      onKeyDown={e => e.key === 'Enter' && handleRenameCollection(col.id)}
+                      data-testid="rename-collection-input"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-1 hover:bg-[#2A2A2A] rounded group/col relative text-gray-300">
+                    <div 
+                      className="flex items-center space-x-1 cursor-pointer text-sm flex-1 overflow-hidden"
+                      onClick={() => {
+                        const el = document.getElementById(`col-reqs-${col.id}`);
+                        if (el) el.classList.toggle('hidden');
+                        const icon = document.getElementById(`col-icon-${col.id}`);
+                        if (icon) icon.style.transform = el?.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(90deg)';
+                      }}
+                      data-testid={`collection-${col.name}`}
+                    >
+                      <ChevronRight id={`col-icon-${col.id}`} size={14} className="text-gray-500 transition-transform" />
+                      <Folder size={14} className="text-gray-400 flex-shrink-0" />
+                      <span className="truncate font-medium text-xs">{col.name}</span>
+                    </div>
+                    <div className="relative">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === col.id ? null : col.id); }}
+                        className="opacity-0 group-hover/col:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
+                        data-testid={`col-menu-btn-${col.name}`}
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                      {openMenuId === col.id && (
+                        <div className="absolute right-0 mt-1 w-32 bg-[#2A2A2A] border border-[#333333] shadow-lg z-50 rounded text-left text-xs py-1 text-white">
+                          <div className="px-3 py-1.5 hover:bg-[#353535] cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditingColId(col.id); setEditColName(col.name); setOpenMenuId(null); }}>Rename</div>
+                          <div className="px-3 py-1.5 hover:bg-[#353535] cursor-pointer" onClick={async (e) => { 
+                            e.stopPropagation(); 
+                            setOpenMenuId(null);
+                            // Ensure the folder is expanded
+                            const el = document.getElementById(`col-reqs-${col.id}`);
+                            if (el) el.classList.remove('hidden');
+                            const icon = document.getElementById(`col-icon-${col.id}`);
+                            if (icon) icon.style.transform = 'rotate(90deg)';
+                            
+                            try {
+                              const res = await fetch('http://127.0.0.1:8000/api/requests', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  name: 'New Request',
+                                  method: 'GET',
+                                  url: '',
+                                  collection_id: col.id,
+                                  headers: '[]',
+                                  query_params: '[]',
+                                  body_type: 'none',
+                                  body: '',
+                                  auth_type: 'none',
+                                  auth_data: '{}'
+                                })
+                              });
+                              if (res.ok) {
+                                const newReq = await res.json();
+                                const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+                                setCollections(await colsRes.json());
+                                
+                                const initialData = {
+                                  saved_id: newReq.id,
+                                  collection_id: col.id,
+                                  name: newReq.name,
+                                  method: newReq.method,
+                                  url: newReq.url,
+                                  headers: [],
+                                  params: [],
+                                  bodyType: newReq.body_type,
+                                  body: newReq.body,
+                                  authType: newReq.auth_type,
+                                  authData: {}
+                                };
+                                addTab(`req-${newReq.id}`, initialData);
+                              }
+                            } catch(err) { console.error(err); }
+                          }}>Add Request</div>
+                          <div className="px-3 py-1.5 hover:bg-red-900/50 text-red-400 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleDeleteCollection(col.id); setOpenMenuId(null); }} data-testid={`delete-collection-${col.name}`}>Delete</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div id={`col-reqs-${col.id}`} className="hidden ml-4 pl-2 border-l border-[#333333]">
+                  {(!col.requests || col.requests.length === 0) ? (
+                    <div className="text-xs text-gray-500 p-1">Empty</div>
+                  ) : (
+                    col.requests.map((req: any) => {
+                      // Issue 5: Reflect unsaved changes from tabs
+                      // Find if this request is open in a tab
+                      const openTab = Object.values(tabs).find((t: any) => t.saved_id === req.id) as any;
+                      const displayMethod = openTab ? openTab.method : req.method;
+                      const displayName = openTab ? (openTab.name || 'Untitled Request') : req.name;
+                      
+                      return (
+                        <div 
+                          key={req.id}
+                          className="flex items-center space-x-2 p-1 hover:bg-[#2A2A2A] rounded cursor-pointer text-sm text-gray-300"
+                          onClick={() => {
+                            if (openTab) {
+                              useStore.getState().setActiveTab(Object.keys(useStore.getState().tabs).find(k => useStore.getState().tabs[k].saved_id === req.id)!);
+                            } else {
+                              const initialData = {
+                                saved_id: req.id,
+                                collection_id: col.id,
+                                name: req.name,
+                                method: req.method,
+                                url: req.url,
+                                headers: JSON.parse(req.headers || '[]'),
+                                params: JSON.parse(req.query_params || '[]'),
+                                bodyType: req.body_type,
+                                body: req.body,
+                                authType: req.auth_type,
+                                authData: JSON.parse(req.auth_data || '{}')
+                              };
+                              addTab(`req-${req.id}`, initialData);
+                            }
+                          }}
+                          data-testid={`req-${displayName}`}
+                        >
+                          <span className={clsx("text-[10px] font-bold w-12 flex-shrink-0", 
+                            displayMethod === 'GET' ? 'text-green-500' :
+                            displayMethod === 'POST' ? 'text-yellow-500' :
+                            displayMethod === 'DELETE' ? 'text-red-500' : 'text-blue-500'
+                          )}>
+                            {displayMethod}
+                          </span>
+                          <span className="truncate text-xs">{displayName}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      );
+    } else if (activeSidebarTab === 'history') {
+      const filteredHist = history.filter(h => h.url.toLowerCase().includes(searchQuery.toLowerCase()));
+      return (
+        <div>
+          <div className="flex items-center px-2 py-1 mb-2">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Recent</span>
+          </div>
+          {filteredHist.length === 0 ? (
+            <div className="text-sm text-gray-500 px-2">No history found.</div>
+          ) : (
+            filteredHist.map(item => (
+              <div key={item.id} 
+                className="flex items-center space-x-2 p-1.5 hover:bg-[#2A2A2A] rounded cursor-pointer text-sm text-gray-300"
+                onClick={() => addTab(`hist-${item.id}`, JSON.parse(item.request_data))}
+              >
+                <span className={clsx("text-[10px] font-bold w-8 flex-shrink-0", 
+                  item.method === 'GET' ? 'text-green-500' :
+                  item.method === 'POST' ? 'text-yellow-500' :
+                  item.method === 'DELETE' ? 'text-red-500' : 'text-blue-500'
+                )}>
+                  {item.method}
+                </span>
+                <span className="truncate flex-1">{item.url}</span>
+              </div>
+            ))
+          )}
+        </div>
+      );
+    } else if (activeSidebarTab === 'environments') {
+      const filteredEnvs = environments.filter(e => e.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      return (
+        <div>
+          <div className="flex items-center px-2 py-1 mb-2">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Environments</span>
+          </div>
+          {filteredEnvs.length === 0 ? (
+            <div className="text-sm text-gray-500 px-2">No environments found.</div>
+          ) : (
+            filteredEnvs.map(env => (
+              <div key={env.id} 
+                className={clsx(
+                  "flex items-center justify-between p-2 rounded cursor-pointer text-sm group",
+                  activeEnvironmentId === env.id.toString() ? "bg-[#2A2A2A]" : "hover:bg-[#202020]"
+                )}
+                onClick={() => {
+                  if (activeEnvironmentId !== env.id.toString()) useStore.getState().setActiveEnvironmentId(env.id.toString());
+                  else {
+                    addTab(`env-${env.id}`, { type: 'environment', envId: env.id, name: env.name, envVars: env.variables ? JSON.parse(env.variables) : [] });
+                  }
+                }}
+              >
+                <div className="flex items-center space-x-2 truncate">
+                  <div className={clsx("w-2 h-2 rounded-full", activeEnvironmentId === env.id.toString() ? "bg-green-500" : "bg-gray-600")} />
+                  <span className="truncate flex-1 text-gray-300">{env.name}</span>
+                </div>
+                <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      addTab(`env-${env.id}`, { type: 'environment', envId: env.id, name: env.name, envVars: env.variables ? JSON.parse(env.variables) : [] });
+                    }}
+                    className="p-1 hover:bg-[#333333] rounded text-gray-400 hover:text-white"
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={(e) => handleDeleteEnvironment(e, env.id)}
+                    className="p-1 hover:bg-[#333333] rounded text-gray-400 hover:text-red-500"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      );
+    } else {
+      return null;
+    }
+  };
+
   return (
-    <div className="w-full h-full flex flex-col bg-[#f9f9f9] dark:bg-[#1c1c1c] border-r border-gray-200 dark:border-gray-800">
-      <div className="flex px-4 py-3 border-b border-gray-200 dark:border-gray-800 space-x-4">
-        <button 
-          onClick={() => setActiveTab('collections')}
-          className={clsx("text-sm font-medium pb-1", activeTab === 'collections' ? "border-b-2 border-orange-500 text-black dark:text-white" : "text-gray-500 hover:text-black dark:hover:text-white")}
-        >
-          Collections
-        </button>
-        <button 
-          onClick={() => setActiveTab('history')}
-          className={clsx("text-sm font-medium pb-1", activeTab === 'history' ? "border-b-2 border-orange-500 text-black dark:text-white" : "text-gray-500 hover:text-black dark:hover:text-white")}
-        >
-          History
-        </button>
+    <div className="w-[260px] h-full flex flex-col bg-[#1C1C1C] border-r border-[#333333] flex-shrink-0 text-[#e5e2e1]">
+      <div className="flex items-center px-3 py-2 border-b border-[#333333] h-12">
+        <div className="flex items-center flex-1 bg-[#131313] rounded border border-[#333333] px-2 py-1">
+          <Search size={14} className="text-gray-500 mr-2" />
+          <input 
+            type="text" 
+            placeholder={`Search ${activeSidebarTab}...`}
+            className="bg-transparent outline-none text-xs text-white w-full"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        {activeSidebarTab === 'collections' && (
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="ml-2 text-gray-400 hover:text-white"
+            data-testid="add-collection-btn"
+          >
+            <Plus size={16} />
+          </button>
+        )}
+        {activeSidebarTab === 'environments' && (
+          <button 
+            onClick={handleCreateEnvironment}
+            className="ml-2 text-gray-400 hover:text-white"
+          >
+            <Plus size={16} />
+          </button>
+        )}
       </div>
       
       <div className="flex-1 overflow-y-auto p-2">
-        {activeTab === 'collections' ? (
-          <div>
-            <div className="flex items-center justify-between px-2 py-1 mb-2 group">
-              <span className="text-xs font-semibold text-gray-500">My Workspace</span>
-              <button 
-                onClick={() => setShowAddModal(true)}
-                className="text-gray-400 hover:text-black dark:hover:text-white"
-                data-testid="add-collection-btn"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-            
-            {showAddModal && (
-              <div className="px-2 mb-2">
-                <input 
-                  type="text"
-                  autoFocus
-                  className="w-full p-1.5 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0d0d0d] rounded outline-none focus:border-orange-500 mb-1"
-                  placeholder="Collection Name"
-                  value={newColName}
-                  onChange={e => setNewColName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleCreateCollection()}
-                  data-testid="add-collection-input"
-                />
-                <div className="flex space-x-1">
-                  <button onClick={handleCreateCollection} className="flex-1 bg-orange-500 text-white text-xs py-1 rounded" data-testid="save-collection-btn">Save</button>
-                  <button onClick={() => setShowAddModal(false)} className="flex-1 bg-gray-200 dark:bg-gray-700 text-black dark:text-white text-xs py-1 rounded">Cancel</button>
-                </div>
-              </div>
-            )}
-            {collections.length === 0 ? (
-              <div className="text-sm text-gray-500 px-2">No collections found.</div>
-            ) : (
-              collections.map(col => (
-                <div key={col.id} className="mb-1">
-                  {editingColId === col.id ? (
-                    <div className="px-2 py-1">
-                      <input 
-                        autoFocus
-                        className="w-full p-1 text-sm bg-white dark:bg-[#0d0d0d] border border-orange-500 rounded outline-none"
-                        value={editColName}
-                        onChange={e => setEditColName(e.target.value)}
-                        onBlur={() => handleRenameCollection(col.id)}
-                        onKeyDown={e => e.key === 'Enter' && handleRenameCollection(col.id)}
-                        data-testid="rename-collection-input"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded group/col relative">
-                      <div 
-                        className="flex items-center space-x-1 cursor-pointer text-sm flex-1 overflow-hidden"
-                        onClick={() => {
-                          const el = document.getElementById(`col-reqs-${col.id}`);
-                          if (el) el.classList.toggle('hidden');
-                          const icon = document.getElementById(`col-icon-${col.id}`);
-                          if (icon) icon.style.transform = el?.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(90deg)';
-                        }}
-                        data-testid={`collection-${col.name}`}
-                      >
-                        <ChevronRight id={`col-icon-${col.id}`} size={14} className="text-gray-400 transition-transform" />
-                        <Folder size={14} className="text-gray-500 flex-shrink-0" />
-                        <span className="truncate font-medium">{col.name}</span>
-                      </div>
-                      <div className="relative">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === col.id ? null : col.id); }}
-                          className="opacity-0 group-hover/col:opacity-100 text-gray-400 hover:text-black dark:hover:text-white p-0.5 rounded hover:bg-gray-300 dark:hover:bg-gray-700"
-                          data-testid={`col-menu-btn-${col.name}`}
-                        >
-                          <MoreVertical size={14} />
-                        </button>
-                        {openMenuId === col.id && (
-                          <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 shadow-lg z-50 rounded text-left text-xs py-1">
-                            <div className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditingColId(col.id); setEditColName(col.name); setOpenMenuId(null); }}>Rename</div>
-                            <div className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer" onClick={(e) => { e.stopPropagation(); addTab(Date.now().toString(), { collection_id: col.id, name: 'Untitled Request' }); setOpenMenuId(null); }}>Add Request</div>
-                            <div className="px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleDeleteCollection(col.id); setOpenMenuId(null); }} data-testid={`delete-collection-${col.name}`}>Delete</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  <div id={`col-reqs-${col.id}`} className="hidden ml-4 pl-2 border-l border-gray-200 dark:border-gray-700">
-                    {(!col.requests || col.requests.length === 0) ? (
-                      <div className="text-xs text-gray-400 p-1">Empty</div>
-                    ) : (
-                      col.requests.map((req: any) => (
-                        <div 
-                          key={req.id}
-                          className="flex items-center space-x-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded cursor-pointer text-sm"
-                          onClick={() => {
-                            // Populate the tab with saved request data
-                            const initialData = {
-                              saved_id: req.id,
-                              collection_id: col.id,
-                              name: req.name,
-                              method: req.method,
-                              url: req.url,
-                              headers: JSON.parse(req.headers || '[]'),
-                              params: JSON.parse(req.query_params || '[]'),
-                              bodyType: req.body_type,
-                              body: req.body,
-                              authType: req.auth_type,
-                              authData: JSON.parse(req.auth_data || '{}')
-                            };
-                            addTab(`req-${req.id}`, initialData);
-                          }}
-                          data-testid={`req-${req.name}`}
-                        >
-                          <span className={clsx("text-[10px] font-bold w-8 flex-shrink-0", 
-                            req.method === 'GET' ? 'text-green-500' :
-                            req.method === 'POST' ? 'text-yellow-500' :
-                            req.method === 'DELETE' ? 'text-red-500' : 'text-blue-500'
-                          )}>
-                            {req.method}
-                          </span>
-                          <span className="truncate text-xs">{req.name}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        ) : (
-          <div>
-            <div className="flex items-center px-2 py-1 mb-2">
-              <span className="text-xs font-semibold text-gray-500">Recent</span>
-            </div>
-            {history.length === 0 ? (
-              <div className="text-sm text-gray-500 px-2">No history found.</div>
-            ) : (
-              history.map(item => (
-                <div key={item.id} 
-                  className="flex items-center space-x-2 p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded cursor-pointer text-sm"
-                  onClick={() => addTab(`hist-${item.id}`, JSON.parse(item.request_data))}
-                >
-                  <span className={clsx("text-xs font-semibold w-10", 
-                    item.method === 'GET' ? 'text-green-500' :
-                    item.method === 'POST' ? 'text-yellow-500' :
-                    item.method === 'DELETE' ? 'text-red-500' : 'text-blue-500'
-                  )}>
-                    {item.method}
-                  </span>
-                  <span className="truncate text-gray-700 dark:text-gray-300 flex-1">{item.url}</span>
-                </div>
-              ))
-            )}
-          </div>
-        )}
+        {renderContent()}
       </div>
     </div>
   );

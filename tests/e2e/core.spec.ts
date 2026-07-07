@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test('has title and collections loaded', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
-  await expect(page.locator('text=Sample API')).toBeVisible();
+  await expect(page.getByTitle('Collections')).toBeVisible();
+  await expect(page.locator('text=My Workspace')).toBeVisible();
 });
 
 test('can send request and receive response', async ({ page }) => {
@@ -39,7 +39,7 @@ test('full collection workflow - add collection, save request, reload, delete co
   await expect(page.locator('text=Status:')).toBeVisible({ timeout: 15000 });
   
   // 3. Save Request to collection
-  const saveBtn = page.locator('button:has-text("Save")');
+  const saveBtn = page.getByTestId('request-save-btn');
   await saveBtn.click();
   await page.getByPlaceholder('e.g. Get User Profile').fill(reqName1);
   // Wait for dropdown to populate, select the collection
@@ -61,7 +61,7 @@ test('full collection workflow - add collection, save request, reload, delete co
   // 6. Inline rename collection
   await reloadedColFolder.hover();
   await page.getByTestId(`col-menu-btn-${colName}`).click(); // Click 3-dot menu
-  await page.locator('text=Rename').click();
+  await page.getByText('Rename', { exact: true }).click();
   const renameInput = page.getByTestId('rename-collection-input');
   await renameInput.fill(`${colName} Renamed`);
   await renameInput.press('Enter');
@@ -73,16 +73,18 @@ test('full collection workflow - add collection, save request, reload, delete co
   await page.getByTestId(`col-menu-btn-${colName} Renamed`).click();
   await page.locator('text=Add Request').click();
   
-  // Rename tab inline
-  const tabSpan = page.locator('span.truncate.flex-1').last();
-  await tabSpan.dblclick();
+  // Wait for the new tab to appear (which is async now due to POST request)
+  const newTab = page.locator('span.truncate.flex-1', { hasText: 'New Request' }).last();
+  await expect(newTab).toBeVisible({ timeout: 5000 });
+  await newTab.dblclick();
   const tabInput = page.locator('input.flex-1.bg-transparent').first();
   await tabInput.fill(reqName2);
   await tabInput.press('Enter');
 
   // Fill URL and Seamless Save
   await page.getByPlaceholder('Enter request URL').fill('https://httpbin.org/uuid');
-  await page.locator('button:has-text("Save")').first().click();
+  await page.getByTestId('request-save-btn').click();
+  await page.waitForTimeout(1000); // Wait for PUT request to complete
   // It shouldn't open a popup, so we verify by reloading and checking if it exists
   await page.reload();
   const finalFolder = page.getByTestId(`collection-${colName} Renamed`);
@@ -98,4 +100,23 @@ test('full collection workflow - add collection, save request, reload, delete co
   
   // Verify deletion
   await expect(finalFolder).not.toBeVisible();
+});
+
+test('can change HTTP method from dropdown', async ({ page }) => {
+  await page.goto('/');
+  
+  // Wait for the app to load
+  await expect(page.getByTitle('Collections')).toBeVisible();
+
+  // Find the method selector (it displays GET by default)
+  const methodSelector = page.getByTestId('method-dropdown-trigger');
+  await methodSelector.click();
+
+  // Click on POST
+  const postOption = page.getByTestId('method-option-POST');
+  await postOption.click();
+
+  // Verify the method is now POST
+  const updatedMethod = page.getByTestId('method-dropdown-trigger-text');
+  await expect(updatedMethod).toHaveText('POST');
 });

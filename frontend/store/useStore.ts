@@ -8,6 +8,7 @@ export interface KeyVal {
 }
 
 export interface RequestState {
+  type?: 'request' | 'environment';
   id?: string;
   saved_id?: number;
   collection_id?: number;
@@ -30,6 +31,7 @@ interface AppState {
   environments: any[];
   activeEnvironmentId: string | null;
   history: any[];
+  activeSidebarTab: 'collections' | 'history' | 'environments';
   
   // Actions
   addTab: (tabId: string, initialData?: Partial<RequestState>) => void;
@@ -40,6 +42,7 @@ interface AppState {
   setEnvironments: (envs: any[]) => void;
   setActiveEnvironmentId: (id: string | null) => void;
   setHistory: (hist: any[]) => void;
+  setActiveSidebarTab: (tab: 'collections' | 'history' | 'environments') => void;
 }
 
 const defaultRequestState: RequestState = {
@@ -64,6 +67,7 @@ export const useStore = create<AppState>((set) => ({
   environments: [],
   activeEnvironmentId: null,
   history: [],
+  activeSidebarTab: 'collections',
   
   addTab: (tabId, initialData) => set((state) => ({
     tabs: { ...state.tabs, [tabId]: { ...defaultRequestState, ...initialData } },
@@ -85,5 +89,6 @@ export const useStore = create<AppState>((set) => ({
   setCollections: (cols) => set({ collections: cols }),
   setEnvironments: (envs) => set({ environments: envs }),
   setActiveEnvironmentId: (id) => set({ activeEnvironmentId: id }),
-  setHistory: (hist) => set({ history: hist })
+  setHistory: (hist) => set({ history: hist }),
+  setActiveSidebarTab: (tab) => set({ activeSidebarTab: tab })
 }));
