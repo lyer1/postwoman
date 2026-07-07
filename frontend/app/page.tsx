@@ -94,6 +94,7 @@ export default function Home() {
             <button 
               onClick={() => addTab(Date.now().toString())}
               className="p-2 text-gray-500 hover:text-white"
+              data-testid="add-tab-btn"
             >
               <Plus size={16} />
             </button>

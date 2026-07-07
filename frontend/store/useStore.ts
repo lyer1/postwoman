@@ -22,6 +22,8 @@ export interface RequestState {
   bodyForm: KeyVal[];
   response: any | null;
   loading: boolean;
+  authType: 'none' | 'basic' | 'bearer';
+  authData: Record<string, string>;
 }
 
 interface AppState {
@@ -56,6 +58,8 @@ const defaultRequestState: RequestState = {
   bodyForm: [],
   response: null,
   loading: false,
+  authType: 'none',
+  authData: {}
 };
 
 export const useStore = create<AppState>((set) => ({

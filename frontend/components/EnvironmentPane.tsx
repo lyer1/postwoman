@@ -27,6 +27,9 @@ export default function EnvironmentPane() {
   const handleUpdateVar = (index: number, field: keyof KeyVal, value: any) => {
     const newVars = [...envVars];
     newVars[index] = { ...newVars[index], [field]: value };
+    if (index === newVars.length - 1 && (field === 'key' || field === 'value') && value !== '') {
+      newVars.push({ id: Date.now().toString(), key: '', value: '', enabled: true });
+    }
     handleUpdateVars(newVars);
   };
 
@@ -36,14 +39,10 @@ export default function EnvironmentPane() {
     handleUpdateVars(newVars);
   };
 
-  const ensureEmptyRow = () => {
-    if (envVars.length === 0 || envVars[envVars.length - 1].key !== '' || envVars[envVars.length - 1].value !== '') {
-      handleUpdateVars([...envVars, { id: Date.now().toString(), key: '', value: '', enabled: true }]);
-    }
-  };
-
   useEffect(() => {
-    ensureEmptyRow();
+    if (envVars.length === 0) {
+      handleUpdateVars([{ id: Date.now().toString(), key: '', value: '', enabled: true }]);
+    }
   }, [envVars.length]);
 
   const handleSave = async () => {

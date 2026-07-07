@@ -78,7 +78,7 @@ async def proxy_request(req: ProxyRequest, session: Session = Depends(get_sessio
     data = None
     if req.body_type == "raw" and isinstance(req.body, str):
         content = interpolate(req.body)
-    elif req.body_type == "urlencoded" and isinstance(req.body, dict):
+    elif req.body_type in ("urlencoded", "formdata") and isinstance(req.body, dict):
         data = {k: interpolate(v) for k, v in req.body.items()}
     elif req.body_type == "json" and req.body:
         if isinstance(req.body, str):
@@ -138,6 +138,7 @@ class CollectionResponse(BaseModel):
     id: int
     name: str
     user_id: int
+    parent_id: Optional[int] = None
     requests: List[Any] = []
 
 @app.get("/api/collections", response_model=List[CollectionResponse])

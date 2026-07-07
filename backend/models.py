@@ -18,10 +18,14 @@ class Collection(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    parent_id: Optional[int] = Field(default=None, foreign_key="collection.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     user: Optional[User] = Relationship(back_populates="collections")
     requests: List["SavedRequest"] = Relationship(back_populates="collection")
+    # Add support for nested folders
+    children: List["Collection"] = Relationship(back_populates="parent")
+    parent: Optional["Collection"] = Relationship(back_populates="children", sa_relationship_kwargs=dict(remote_side="Collection.id"))
 
 
 class SavedRequest(SQLModel, table=True):

@@ -3,6 +3,8 @@ import { useStore } from '../store/useStore';
 import clsx from 'clsx';
 import { useState } from 'react';
 import { Rocket } from 'lucide-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 export default function ResponsePane() {
   const { tabs, activeTabId } = useStore();
@@ -65,19 +67,54 @@ export default function ResponsePane() {
               <button onClick={() => setView('Raw')} className={clsx("text-xs font-medium px-2 py-1 rounded", view === 'Raw' ? "bg-[#2A2A2A] text-white" : "text-gray-500 hover:text-white")}>Raw</button>
             </div>
           )}
-          <div className="flex-1 overflow-auto bg-[#131313] border border-[#333333] p-2 text-sm font-[JetBrains_Mono] text-gray-300 rounded">
+          <div className="flex-1 overflow-auto bg-[#131313] border border-[#333333] p-0 text-sm rounded">
             {error ? (
-              <div className="text-[#ffb4ab]">{error}</div>
+              <div className="text-[#ffb4ab] p-2">{error}</div>
             ) : (
-              <pre className="whitespace-pre-wrap break-all">
-                {view === 'Pretty' ? (typeof body === 'object' ? JSON.stringify(body, null, 2) : body) : (typeof body === 'object' ? JSON.stringify(body) : body)}
-              </pre>
+              view === 'Pretty' && typeof body === 'object' ? (
+                <SyntaxHighlighter
+                  language="json"
+                  style={vscDarkPlus}
+                  customStyle={{ margin: 0, padding: '0.5rem', background: 'transparent' }}
+                  wrapLines={true}
+                >
+                  {JSON.stringify(body, null, 2)}
+                </SyntaxHighlighter>
+              ) : (
+                <pre className="whitespace-pre-wrap break-all p-2 font-[JetBrains_Mono] text-gray-300">
+                  {typeof body === 'object' ? JSON.stringify(body) : body}
+                </pre>
+              )
             )}
           </div>
         </div>
       )}
 
-      {tab !== 'Body' && (
+      {tab === 'Headers' && (
+        <div className="flex-1 overflow-auto bg-[#131313] border border-[#333333] rounded">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-[#1C1C1C] border-b border-[#333333] text-gray-400">
+              <tr>
+                <th className="px-3 py-2 font-semibold w-1/3 border-r border-[#333333]">Key</th>
+                <th className="px-3 py-2 font-semibold">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {headers && Object.entries(headers).map(([k, v]: [string, any], i) => (
+                <tr key={i} className="border-b border-[#333333] hover:bg-[#1C1C1C]">
+                  <td className="px-3 py-1.5 border-r border-[#333333] font-mono text-gray-300 break-all">{k}</td>
+                  <td className="px-3 py-1.5 font-mono text-[#e5e2e1] break-all">{v}</td>
+                </tr>
+              ))}
+              {(!headers || Object.keys(headers).length === 0) && (
+                <tr><td colSpan={2} className="px-3 py-4 text-center text-gray-500">No headers</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab !== 'Body' && tab !== 'Headers' && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
           {tab} (Coming Soon)
         </div>
