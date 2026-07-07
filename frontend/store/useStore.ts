@@ -9,6 +9,8 @@ export interface KeyVal {
 
 export interface RequestState {
   id?: string;
+  saved_id?: number;
+  collection_id?: number;
   name?: string;
   method: string;
   url: string;
@@ -26,8 +28,8 @@ interface AppState {
   tabs: Record<string, RequestState>;
   collections: any[];
   environments: any[];
+  activeEnvironmentId: string | null;
   history: any[];
-  activeEnvironment: any | null;
   
   // Actions
   addTab: (tabId: string, initialData?: Partial<RequestState>) => void;
@@ -36,11 +38,12 @@ interface AppState {
   updateTab: (tabId: string, data: Partial<RequestState>) => void;
   setCollections: (cols: any[]) => void;
   setEnvironments: (envs: any[]) => void;
+  setActiveEnvironmentId: (id: string | null) => void;
   setHistory: (hist: any[]) => void;
-  setActiveEnvironment: (env: any) => void;
 }
 
 const defaultRequestState: RequestState = {
+  name: 'Untitled Request',
   method: 'GET',
   url: '',
   headers: [],
@@ -59,8 +62,8 @@ export const useStore = create<AppState>((set) => ({
   },
   collections: [],
   environments: [],
+  activeEnvironmentId: null,
   history: [],
-  activeEnvironment: null,
   
   addTab: (tabId, initialData) => set((state) => ({
     tabs: { ...state.tabs, [tabId]: { ...defaultRequestState, ...initialData } },
@@ -81,6 +84,6 @@ export const useStore = create<AppState>((set) => ({
   })),
   setCollections: (cols) => set({ collections: cols }),
   setEnvironments: (envs) => set({ environments: envs }),
-  setHistory: (hist) => set({ history: hist }),
-  setActiveEnvironment: (env) => set({ activeEnvironment: env })
+  setActiveEnvironmentId: (id) => set({ activeEnvironmentId: id }),
+  setHistory: (hist) => set({ history: hist })
 }));

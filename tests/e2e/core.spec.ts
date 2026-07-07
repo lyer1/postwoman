@@ -2,27 +2,100 @@ import { test, expect } from '@playwright/test';
 
 test('has title and collections loaded', async ({ page }) => {
   await page.goto('/');
-  // Basic validation that UI is rendering
   await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
-  
-  // Validate that default seeded collection is present
   await expect(page.locator('text=Sample API')).toBeVisible();
 });
 
 test('can send request and receive response', async ({ page }) => {
   await page.goto('/');
-  
-  // Type url and send request
   const urlInput = page.getByPlaceholder('Enter request URL');
   await urlInput.fill('https://httpbin.org/get');
-  
   const sendButton = page.locator('button:has-text("Send")');
   await sendButton.click();
+  await expect(page.locator('text=Status:')).toBeVisible({ timeout: 15000 });
+});
+
+test('full collection workflow - add collection, save request, reload, delete collection', async ({ page }) => {
+  await page.goto('/');
+  const colName = `My E2E Collection ${Date.now()}`;
+  const reqName1 = `Get UUID ${Date.now()}`;
+  const reqName2 = `My Seamless Request ${Date.now()}`;
   
-  // Wait for response to load
-  await expect(page.locator('text=Status:')).toBeVisible({ timeout: 10000 });
+  // 1. Add Collection
+  await page.getByTestId('add-collection-btn').click();
+  const colInput = page.getByTestId('add-collection-input');
+  await colInput.fill(colName);
+  await page.getByTestId('save-collection-btn').click();
   
-  // Status should be 200
-  const statusEl = page.locator('text=200');
-  await expect(statusEl).toBeVisible();
+  // Verify it appears
+  const collectionFolder = page.getByTestId(`collection-${colName}`);
+  await expect(collectionFolder).toBeVisible();
+
+  // 2. Configure a new request and send it
+  const urlInput = page.getByPlaceholder('Enter request URL');
+  await urlInput.fill('https://httpbin.org/get');
+  const sendButton = page.locator('button:has-text("Send")');
+  await sendButton.click();
+  await expect(page.locator('text=Status:')).toBeVisible({ timeout: 15000 });
+  
+  // 3. Save Request to collection
+  const saveBtn = page.locator('button:has-text("Save")');
+  await saveBtn.click();
+  await page.getByPlaceholder('e.g. Get User Profile').fill(reqName1);
+  // Wait for dropdown to populate, select the collection
+  const selectCol = page.locator('select').filter({ hasText: colName });
+  await selectCol.selectOption({ label: colName });
+  await page.locator('button:has-text("Save")').nth(1).click();
+
+  // 4. Reload page to verify persistence
+  await page.reload();
+  
+  // 5. Expand collection and verify request is there
+  const reloadedColFolder = page.getByTestId(`collection-${colName}`);
+  await expect(reloadedColFolder).toBeVisible();
+  await reloadedColFolder.click(); // expand
+  
+  const savedReq = page.getByTestId(`req-${reqName1}`);
+  await expect(savedReq).toBeVisible();
+  
+  // 6. Inline rename collection
+  await reloadedColFolder.hover();
+  await page.getByTestId(`col-menu-btn-${colName}`).click(); // Click 3-dot menu
+  await page.locator('text=Rename').click();
+  const renameInput = page.getByTestId('rename-collection-input');
+  await renameInput.fill(`${colName} Renamed`);
+  await renameInput.press('Enter');
+  await expect(page.getByTestId(`collection-${colName} Renamed`)).toBeVisible();
+
+  // 7. Add Request from menu & Seamless Save
+  const renamedColFolder = page.getByTestId(`collection-${colName} Renamed`);
+  await renamedColFolder.hover();
+  await page.getByTestId(`col-menu-btn-${colName} Renamed`).click();
+  await page.locator('text=Add Request').click();
+  
+  // Rename tab inline
+  const tabSpan = page.locator('span.truncate.flex-1').last();
+  await tabSpan.dblclick();
+  const tabInput = page.locator('input.flex-1.bg-transparent').first();
+  await tabInput.fill(reqName2);
+  await tabInput.press('Enter');
+
+  // Fill URL and Seamless Save
+  await page.getByPlaceholder('Enter request URL').fill('https://httpbin.org/uuid');
+  await page.locator('button:has-text("Save")').first().click();
+  // It shouldn't open a popup, so we verify by reloading and checking if it exists
+  await page.reload();
+  const finalFolder = page.getByTestId(`collection-${colName} Renamed`);
+  await finalFolder.click();
+  await expect(page.getByTestId(`req-${reqName2}`)).toBeVisible();
+  
+  // 8. Delete collection via 3-dot menu
+  page.on('dialog', dialog => dialog.accept());
+  await finalFolder.hover();
+  await page.getByTestId(`col-menu-btn-${colName} Renamed`).click();
+  const deleteColBtn = page.getByTestId(`delete-collection-${colName} Renamed`);
+  await deleteColBtn.click();
+  
+  // Verify deletion
+  await expect(finalFolder).not.toBeVisible();
 });

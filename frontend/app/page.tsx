@@ -2,19 +2,26 @@
 import Sidebar from '../components/Sidebar';
 import RequestPane from '../components/RequestPane';
 import ResponsePane from '../components/ResponsePane';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Plus, X } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function Home() {
-  const { tabs, activeTabId, setActiveTab, closeTab, addTab, setCollections, setHistory } = useStore();
+  const { tabs, activeTabId, setActiveTab, closeTab, addTab, updateTab, setCollections, setHistory, setEnvironments } = useStore();
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editTabName, setEditTabName] = useState('');
 
   useEffect(() => {
     // Fetch initial data
     fetch('http://127.0.0.1:8000/api/collections')
       .then(res => res.json())
       .then(data => setCollections(data))
+      .catch(console.error);
+
+    fetch('http://127.0.0.1:8000/api/environments')
+      .then(res => res.json())
+      .then(data => setEnvironments(data))
       .catch(console.error);
 
     fetch('http://127.0.0.1:8000/api/history')
@@ -46,7 +53,23 @@ export default function Home() {
                 tabs[tabId].method === 'POST' ? 'text-yellow-500' :
                 tabs[tabId].method === 'DELETE' ? 'text-red-500' : 'text-blue-500'
               )}>{tabs[tabId].method}</span>
-              <span className="truncate flex-1">{tabs[tabId].url || 'Untitled Request'}</span>
+              {editingTabId === tabId ? (
+                <input 
+                  autoFocus
+                  className="flex-1 bg-transparent border-none outline-none text-xs w-24"
+                  value={editTabName}
+                  onChange={e => setEditTabName(e.target.value)}
+                  onBlur={() => { updateTab(tabId, { name: editTabName }); setEditingTabId(null); }}
+                  onKeyDown={e => { if (e.key === 'Enter') { updateTab(tabId, { name: editTabName }); setEditingTabId(null); } }}
+                />
+              ) : (
+                <span 
+                  className="truncate flex-1" 
+                  onDoubleClick={() => { setEditingTabId(tabId); setEditTabName(tabs[tabId].name || 'Untitled Request'); }}
+                >
+                  {tabs[tabId].name || tabs[tabId].url || 'Untitled Request'}
+                </span>
+              )}
               <button 
                 onClick={(e) => { e.stopPropagation(); closeTab(tabId); }}
                 className="ml-2 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 rounded p-1"

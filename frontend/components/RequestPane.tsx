@@ -1,14 +1,17 @@
 'use client';
 import { useStore, KeyVal } from '../store/useStore';
-import { Play, Plus, Trash2 } from 'lucide-react';
+import { Play, Plus, Trash2, Save } from 'lucide-react';
 import clsx from 'clsx';
 import { useState } from 'react';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 
 export default function RequestPane() {
-  const { tabs, activeTabId, updateTab, activeEnvironment } = useStore();
+  const { tabs, activeTabId, updateTab, environments, activeEnvironmentId, setActiveEnvironmentId, collections, setCollections } = useStore();
   const [innerTab, setInnerTab] = useState<'Params' | 'Headers' | 'Body' | 'Auth'>('Params');
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveReqName, setSaveReqName] = useState('');
+  const [saveCollectionId, setSaveCollectionId] = useState('');
   
   if (!activeTabId || !tabs[activeTabId]) return <div className="h-full flex items-center justify-center text-gray-500">No active request</div>;
   
@@ -36,13 +39,101 @@ export default function RequestPane() {
           headers: headers,
           params: params,
           bodyType: req.bodyType,
-          body: parsedBody
+          body: parsedBody,
+          environment_id: activeEnvironmentId ? parseInt(activeEnvironmentId) : null
         })
       });
       const data = await res.json();
       updateTab(activeTabId, { loading: false, response: data });
     } catch (e: any) {
       updateTab(activeTabId, { loading: false, response: { error: e.message }});
+    }
+  };
+
+  const handleSaveDirect = async () => {
+    if (req.saved_id) {
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/requests/${req.saved_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: req.name || 'Untitled Request',
+            method: req.method,
+            url: req.url,
+            collection_id: req.collection_id,
+            headers: JSON.stringify(req.headers),
+            query_params: JSON.stringify(req.params),
+            body_type: req.bodyType,
+            body: req.bodyType === 'raw' ? req.bodyRaw : JSON.stringify(req.bodyForm),
+            auth_type: req.authType,
+            auth_data: JSON.stringify(req.authData)
+          })
+        });
+        if (res.ok) {
+          const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+          setCollections(await colsRes.json());
+        }
+      } catch (e) { console.error(e); }
+    } else if (req.collection_id) {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: req.name || 'Untitled Request',
+            method: req.method,
+            url: req.url,
+            collection_id: req.collection_id,
+            headers: JSON.stringify(req.headers),
+            query_params: JSON.stringify(req.params),
+            body_type: req.bodyType,
+            body: req.bodyType === 'raw' ? req.bodyRaw : JSON.stringify(req.bodyForm),
+            auth_type: req.authType,
+            auth_data: JSON.stringify(req.authData)
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          updateTab(activeTabId, { saved_id: data.id });
+          const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+          setCollections(await colsRes.json());
+        }
+      } catch (e) { console.error(e); }
+    } else {
+      setSaveReqName(req.name || '');
+      setSaveCollectionId('');
+      setShowSaveModal(true);
+    }
+  };
+
+  const handleModalSave = async () => {
+    if (!saveReqName || !saveCollectionId) return;
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: saveReqName,
+          method: req.method,
+          url: req.url,
+          collection_id: parseInt(saveCollectionId),
+          headers: JSON.stringify(req.headers),
+          query_params: JSON.stringify(req.params),
+          body_type: req.bodyType,
+          body: req.bodyType === 'raw' ? req.bodyRaw : JSON.stringify(req.bodyForm),
+          auth_type: req.authType,
+          auth_data: JSON.stringify(req.authData)
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        updateTab(activeTabId, { saved_id: data.id, collection_id: parseInt(saveCollectionId), name: saveReqName });
+        setShowSaveModal(false);
+        const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+        setCollections(await colsRes.json());
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -133,7 +224,61 @@ export default function RequestPane() {
         >
           {req.loading ? 'Sending...' : <><Play size={16} className="mr-2 fill-current" /> Send</>}
         </button>
+        <button 
+          onClick={handleSaveDirect}
+          className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-black dark:text-white px-4 py-2 rounded text-sm font-semibold flex items-center transition-colors"
+        >
+          <Save size={16} className="mr-2" /> Save
+        </button>
       </div>
+
+      <div className="flex justify-end mb-4">
+        <select 
+          className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 text-sm p-1.5 rounded outline-none"
+          value={activeEnvironmentId || ''}
+          onChange={(e) => setActiveEnvironmentId(e.target.value || null)}
+        >
+          <option value="">No Environment</option>
+          {environments.map(env => (
+            <option key={env.id} value={env.id}>{env.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[#1c1c1c] p-6 rounded-lg w-96 shadow-xl border border-gray-200 dark:border-gray-800">
+            <h2 className="text-lg font-bold mb-4">Save Request</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Request Name</label>
+              <input 
+                type="text" 
+                className="w-full p-2 bg-gray-50 dark:bg-[#0d0d0d] border border-gray-200 dark:border-gray-800 rounded outline-none focus:border-orange-500"
+                value={saveReqName}
+                onChange={e => setSaveReqName(e.target.value)}
+                placeholder="e.g. Get User Profile"
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-1">Select Collection</label>
+              <select 
+                className="w-full p-2 bg-gray-50 dark:bg-[#0d0d0d] border border-gray-200 dark:border-gray-800 rounded outline-none focus:border-orange-500"
+                value={saveCollectionId}
+                onChange={e => setSaveCollectionId(e.target.value)}
+              >
+                <option value="" disabled>Select...</option>
+                {collections.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button onClick={() => setShowSaveModal(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-black dark:hover:text-white font-medium">Cancel</button>
+              <button onClick={handleModalSave} disabled={!saveReqName || !saveCollectionId} className="px-4 py-2 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded font-medium disabled:opacity-50">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex space-x-6 border-b border-gray-200 dark:border-gray-800 mb-4">
         {['Params', 'Headers', 'Body', 'Auth'].map(tab => (

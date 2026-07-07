@@ -31,6 +31,8 @@ def read_root():
 
 # --- Proxy Endpoint ---
 
+from typing import List, Dict, Any, Optional
+
 class ProxyRequest(BaseModel):
     method: str
     url: str
@@ -38,31 +40,59 @@ class ProxyRequest(BaseModel):
     params: Dict[str, str] = {}
     body: Any = None
     body_type: str = "none" # "none", "raw", "formdata", "urlencoded"
+    environment_id: Optional[int] = None
 
 @app.post("/api/proxy")
 async def proxy_request(req: ProxyRequest, session: Session = Depends(get_session)):
+    # Fetch environment if provided
+    env_vars = {}
+    if req.environment_id:
+        env = session.get(Environment, req.environment_id)
+        if env:
+            try:
+                variables = json.loads(env.variables)
+                for v in variables:
+                    if v.get("enabled", True):
+                        env_vars[v["key"]] = v["value"]
+            except Exception:
+                pass
+
+    def interpolate(text: str) -> str:
+        if not isinstance(text, str):
+            return text
+        for k, v in env_vars.items():
+            text = text.replace(f"{{{{{k}}}}}", str(v))
+        return text
+
     # Prepare the request
     start_time = time.time()
     
+    # Process url
+    url = interpolate(req.url)
+
     # Process headers
-    req_headers = httpx.Headers(req.headers)
+    req_headers = httpx.Headers({k: interpolate(v) for k, v in req.headers.items()})
     
     # Prepare content
     content = None
     data = None
     if req.body_type == "raw" and isinstance(req.body, str):
-        content = req.body
+        content = interpolate(req.body)
     elif req.body_type == "urlencoded" and isinstance(req.body, dict):
-        data = req.body
+        data = {k: interpolate(v) for k, v in req.body.items()}
     elif req.body_type == "json" and req.body:
-        content = json.dumps(req.body)
+        if isinstance(req.body, str):
+            content = interpolate(req.body)
+        else:
+            body_str = interpolate(json.dumps(req.body))
+            content = body_str
         req_headers["Content-Type"] = "application/json"
     
     try:
         async with httpx.AsyncClient() as client:
             response = await client.request(
                 method=req.method,
-                url=req.url,
+                url=url,
                 headers=req_headers,
                 params=req.params,
                 content=content,
@@ -104,7 +134,13 @@ async def proxy_request(req: ProxyRequest, session: Session = Depends(get_sessio
 
 # --- Collections ---
 
-@app.get("/api/collections")
+class CollectionResponse(BaseModel):
+    id: int
+    name: str
+    user_id: int
+    requests: List[Any] = []
+
+@app.get("/api/collections", response_model=List[CollectionResponse])
 def get_collections(session: Session = Depends(get_session)):
     collections = session.exec(select(Collection)).all()
     return collections
@@ -126,6 +162,17 @@ def delete_collection(collection_id: int, session: Session = Depends(get_session
     session.delete(collection)
     session.commit()
     return {"ok": True}
+
+@app.put("/api/collections/{collection_id}")
+def update_collection(collection_id: int, col_data: Collection, session: Session = Depends(get_session)):
+    collection = session.get(Collection, collection_id)
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    collection.name = col_data.name
+    session.add(collection)
+    session.commit()
+    session.refresh(collection)
+    return collection
 
 
 # --- Saved Requests ---
@@ -152,6 +199,26 @@ def delete_request(request_id: int, session: Session = Depends(get_session)):
     session.delete(req)
     session.commit()
     return {"ok": True}
+
+@app.put("/api/requests/{request_id}")
+def update_request(request_id: int, req_data: SavedRequest, session: Session = Depends(get_session)):
+    req = session.get(SavedRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    req.name = req_data.name
+    req.method = req_data.method
+    req.url = req_data.url
+    req.collection_id = req_data.collection_id
+    req.headers = req_data.headers
+    req.query_params = req_data.query_params
+    req.body_type = req_data.body_type
+    req.body = req_data.body
+    req.auth_type = req_data.auth_type
+    req.auth_data = req_data.auth_data
+    session.add(req)
+    session.commit()
+    session.refresh(req)
+    return req
 
 
 # --- Environments ---
