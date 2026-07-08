@@ -270,7 +270,7 @@ export default function Sidebar() {
                       <div className="relative">
                         <button 
                           onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === `col-${col.id}` ? null : `col-${col.id}`); }}
-                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
+                          className="text-white hover:text-gray-200 p-0.5 rounded hover:bg-[#333333]"
                           data-testid={`col-menu-btn-${col.name}`}
                         >
                           <MoreVertical size={14} />
@@ -403,7 +403,7 @@ export default function Sidebar() {
                           <div className="relative">
                             <button 
                               onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === `req-${req.id}` ? null : `req-${req.id}`); }}
-                              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
+                              className="text-white hover:text-gray-200 p-0.5 rounded hover:bg-[#333333]"
                             >
                               <MoreVertical size={14} />
                             </button>
