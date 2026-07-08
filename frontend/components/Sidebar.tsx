@@ -34,7 +34,7 @@ export default function Sidebar() {
       try {
         const content = evt.target?.result as string;
         await importPostmanCollection(content, async () => {
-          const data = await fetch('http://127.0.0.1:8000/api/collections').then(r => r.json());
+          const data = await fetch('/api/collections').then(r => r.json());
           setCollections(data);
         });
       } catch (err: any) {
@@ -50,7 +50,7 @@ export default function Sidebar() {
   const handleCreateCollection = async () => {
     if (!newColName) return;
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/collections', {
+      const res = await fetch('/api/collections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newColName, user_id: 1 })
@@ -58,7 +58,7 @@ export default function Sidebar() {
       if (res.ok) {
         setShowAddModal(false);
         setNewColName('');
-        const data = await fetch('http://127.0.0.1:8000/api/collections').then(r => r.json());
+        const data = await fetch('/api/collections').then(r => r.json());
         setCollections(data);
       }
     } catch (e) {
@@ -69,9 +69,9 @@ export default function Sidebar() {
   const handleDeleteCollection = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this collection and all its saved requests?")) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/collections/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/collections/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        const data = await fetch('http://127.0.0.1:8000/api/collections').then(r => r.json());
+        const data = await fetch('/api/collections').then(r => r.json());
         setCollections(data);
       }
     } catch (e) {
@@ -82,9 +82,9 @@ export default function Sidebar() {
   const handleDeleteRequest = async (reqId: number) => {
     if (!window.confirm("Are you sure you want to delete this request?")) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/requests/${reqId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/requests/${reqId}`, { method: 'DELETE' });
       if (res.ok) {
-        const data = await fetch('http://127.0.0.1:8000/api/collections').then(r => r.json());
+        const data = await fetch('/api/collections').then(r => r.json());
         setCollections(data);
         const tabId = Object.keys(useStore.getState().tabs).find(k => useStore.getState().tabs[k].saved_id === reqId);
         if (tabId) useStore.getState().removeTab(tabId);
@@ -101,13 +101,13 @@ export default function Sidebar() {
     }
     setIsRenaming(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/collections/${id}`, {
+      const res = await fetch(`/api/collections/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editColName, user_id: 1 })
       });
       if (res.ok) {
-        const data = await fetch('http://127.0.0.1:8000/api/collections').then(r => r.json());
+        const data = await fetch('/api/collections').then(r => r.json());
         setCollections(data);
       }
     } catch (e) {
@@ -119,14 +119,14 @@ export default function Sidebar() {
 
   const handleCreateEnvironment = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/environments', {
+      const res = await fetch('/api/environments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'New Environment' })
       });
       if (res.ok) {
         const newEnv = await res.json();
-        const data = await fetch('http://127.0.0.1:8000/api/environments').then(r => r.json());
+        const data = await fetch('/api/environments').then(r => r.json());
         setEnvironments(data);
         addTab(`env-${newEnv.id}`, { type: 'environment', envId: newEnv.id, name: newEnv.name, envVars: [] });
       }
@@ -138,7 +138,7 @@ export default function Sidebar() {
   const handleDeleteEnvironment = async (e: React.MouseEvent, envId: number) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/environments/${envId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/environments/${envId}`, { method: 'DELETE' });
       if (res.ok) {
         setEnvironments(environments.filter(e => e.id !== envId));
         if (activeEnvironmentId === envId.toString()) {
@@ -284,13 +284,13 @@ export default function Sidebar() {
                               e.stopPropagation(); 
                               setOpenMenuId(null);
                               try {
-                                const res = await fetch('http://127.0.0.1:8000/api/collections', {
+                                const res = await fetch('/api/collections', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ name: 'New Folder', parent_id: col.id })
                                 });
                                 if (res.ok) {
-                                  const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+                                  const colsRes = await fetch('/api/collections');
                                   setCollections(await colsRes.json());
                                   const el = document.getElementById(`col-reqs-${col.id}`);
                                   if (el) el.classList.remove('hidden');
@@ -307,7 +307,7 @@ export default function Sidebar() {
                               const icon = document.getElementById(`col-icon-${col.id}`);
                               if (icon) icon.style.transform = 'rotate(90deg)';
                               try {
-                                const res = await fetch('http://127.0.0.1:8000/api/requests', {
+                                const res = await fetch('/api/requests', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({
@@ -325,7 +325,7 @@ export default function Sidebar() {
                                 });
                                 if (res.ok) {
                                   const newReq = await res.json();
-                                  const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+                                  const colsRes = await fetch('/api/collections');
                                   setCollections(await colsRes.json());
                                   
                                   const initialData = {

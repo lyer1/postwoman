@@ -37,6 +37,8 @@ Postwoman is an open-source, full-stack API client designed for rapid API testin
 ### 🌐 Proxy Backend & History
 - **CORS Bypass**: All requests are routed through a Python `/api/proxy` backend which acts as an intermediary, avoiding browser CORS restrictions.
 - **History Tracking**: The backend logs all sent requests, which appear in the Activity Bar's History tab.
+- **History Restoration**: Clicking a history entry instantly re-hydrates a new Request Tab with the exact URL, Headers, and Body from the past request.
+- **Clear History**: Maintain a clean workspace by permanently deleting all history logs natively from the Sidebar.
 
 ### 🛠 Tools & Utilities
 - **Code Generation**: Export the current request natively to `cURL`, `Fetch API`, and `Python requests`.

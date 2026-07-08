@@ -111,7 +111,7 @@ export default function RequestPane() {
 
       // Sync environment changes to backend if there's an active environment
       if (envModified && activeEnv) {
-        await fetch(`http://127.0.0.1:8000/api/environments/${activeEnv.id}`, {
+        await fetch(`/api/environments/${activeEnv.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -119,7 +119,7 @@ export default function RequestPane() {
             variables: JSON.stringify(envVars)
           })
         });
-        const envsRes = await fetch('http://127.0.0.1:8000/api/environments');
+        const envsRes = await fetch('/api/environments');
         if (envsRes.ok) {
           useStore.getState().setEnvironments(await envsRes.json());
         }
@@ -145,7 +145,7 @@ export default function RequestPane() {
         parsedBody = currentReq.bodyForm.filter(f => f.enabled && f.key).reduce((acc, f) => ({...acc, [resolveVars(f.key)]: resolveVars(f.value)}), {});
       }
 
-      const res = await fetch('http://127.0.0.1:8000/api/proxy', {
+      const res = await fetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -178,7 +178,7 @@ export default function RequestPane() {
           fn(pw);
           
           if (envModified && activeEnv) {
-            await fetch(`http://127.0.0.1:8000/api/environments/${activeEnv.id}`, {
+            await fetch(`/api/environments/${activeEnv.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -186,7 +186,7 @@ export default function RequestPane() {
                 variables: JSON.stringify(envVars)
               })
             });
-            const envsRes = await fetch('http://127.0.0.1:8000/api/environments');
+            const envsRes = await fetch('/api/environments');
             if (envsRes.ok) useStore.getState().setEnvironments(await envsRes.json());
           }
         } catch (err) {
@@ -205,7 +205,7 @@ export default function RequestPane() {
     const currentReq = useStore.getState().tabs[activeTabId];
     if (currentReq.saved_id) {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/requests/${currentReq.saved_id}`, {
+        const res = await fetch(`/api/requests/${currentReq.saved_id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -224,14 +224,14 @@ export default function RequestPane() {
           })
         });
         if (res.ok) {
-          const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+          const colsRes = await fetch('/api/collections');
           setCollections(await colsRes.json());
           triggerToast();
         }
       } catch (e) { console.error(e); }
     } else if (currentReq.collection_id) {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/requests', {
+        const res = await fetch('/api/requests', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -252,7 +252,7 @@ export default function RequestPane() {
         if (res.ok) {
           const data = await res.json();
           updateTab(activeTabId, { saved_id: data.id });
-          const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+          const colsRes = await fetch('/api/collections');
           setCollections(await colsRes.json());
           triggerToast();
         }
@@ -268,7 +268,7 @@ export default function RequestPane() {
     const currentReq = useStore.getState().tabs[activeTabId];
     if (!saveReqName || !saveCollectionId) return;
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/requests', {
+      const res = await fetch('/api/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -290,7 +290,7 @@ export default function RequestPane() {
         const data = await res.json();
         updateTab(activeTabId, { saved_id: data.id, collection_id: parseInt(saveCollectionId), name: saveReqName });
         setShowSaveModal(false);
-        const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
+        const colsRes = await fetch('/api/collections');
         setCollections(await colsRes.json());
         triggerToast();
       }

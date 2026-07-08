@@ -16,17 +16,17 @@ export default function Home() {
 
   useEffect(() => {
     // Fetch initial data
-    fetch('http://127.0.0.1:8000/api/collections')
+    fetch('/api/collections')
       .then(res => res.json())
       .then(data => setCollections(data))
       .catch(console.error);
 
-    fetch('http://127.0.0.1:8000/api/environments')
+    fetch('/api/environments')
       .then(res => res.json())
       .then(data => setEnvironments(data))
       .catch(console.error);
 
-    fetch('http://127.0.0.1:8000/api/history')
+    fetch('/api/history')
       .then(res => res.json())
       .then(data => setHistory(data))
       .catch(console.error);

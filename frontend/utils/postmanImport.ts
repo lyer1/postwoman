@@ -12,7 +12,7 @@ export async function importPostmanCollection(jsonString: string, refreshCollect
 
   // Create root collection
   const rootName = collectionData.info.name || 'Imported Collection';
-  const rootRes = await fetch('http://127.0.0.1:8000/api/collections', {
+  const rootRes = await fetch('/api/collections', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: rootName, user_id: 1 })
@@ -28,7 +28,7 @@ export async function importPostmanCollection(jsonString: string, refreshCollect
     for (const item of items) {
       if (item.item) {
         // It's a folder
-        const folderRes = await fetch('http://127.0.0.1:8000/api/collections', {
+        const folderRes = await fetch('/api/collections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: item.name || 'Folder', user_id: 1, parent_id: parentId })
@@ -121,7 +121,7 @@ export async function importPostmanCollection(jsonString: string, refreshCollect
           });
         }
 
-        await fetch('http://127.0.0.1:8000/api/requests', {
+        await fetch('/api/requests', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

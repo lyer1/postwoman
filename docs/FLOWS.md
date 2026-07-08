@@ -167,3 +167,21 @@ stateDiagram-v2
     ExportCollection --> TransformToPostmanSchema: Map IDs and Arrays
     TransformToPostmanSchema --> TriggerBrowserDownload: Blob -> JSON File
 ```
+
+## 7. History Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> HistoryTabActive
+    
+    HistoryTabActive --> SearchHistory: Type in search bar
+    HistoryTabActive --> ViewRecent: Scroll history list
+    
+    ViewRecent --> RestoreHistory: Click history entry
+    
+    state RestoreHistory {
+        [*] --> ParseJSON: Read entry request_data
+        ParseJSON --> MapToZustand: Format headers array, body
+        MapToZustand --> AddTab: Open new Request Tab
+    }
+```

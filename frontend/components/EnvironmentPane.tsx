@@ -54,7 +54,7 @@ export default function EnvironmentPane() {
     const varsToSave = envVars.filter(v => v.key.trim() !== '');
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/environments/${currentTab.envId}`, {
+      const res = await fetch(`/api/environments/${currentTab.envId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -64,7 +64,7 @@ export default function EnvironmentPane() {
       });
       
       if (res.ok) {
-        const data = await fetch('http://127.0.0.1:8000/api/environments').then(r => r.json());
+        const data = await fetch('/api/environments').then(r => r.json());
         setEnvironments(data);
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);

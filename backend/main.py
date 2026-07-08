@@ -24,10 +24,13 @@ app.add_middleware(
 def on_startup():
     create_db_and_tables()
 
-@app.get("/")
-def read_root():
-    return {"message": "Postwoman backend is running"}
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "out"))
+
+# We will mount _next at the bottom to avoid conflicts with /api
 
 # --- Proxy Endpoint ---
 
@@ -41,6 +44,10 @@ class ProxyRequest(BaseModel):
     body: Any = None
     body_type: str = "none" # "none", "raw", "formdata", "urlencoded"
     environment_id: Optional[int] = None
+    auth_type: str = "none"
+    auth_data: dict = {}
+    pre_request_script: str = ""
+    post_response_script: str = ""
 
 @app.post("/api/proxy")
 async def proxy_request(req: ProxyRequest, session: Session = Depends(get_session)):
@@ -268,3 +275,26 @@ def delete_environment(env_id: int, session: Session = Depends(get_session)):
 def get_history(session: Session = Depends(get_session)):
     history = session.exec(select(History).order_by(History.sent_at.desc()).limit(50)).all()
     return history
+
+@app.delete("/api/history")
+def delete_history(session: Session = Depends(get_session)):
+    history_items = session.exec(select(History)).all()
+    for item in history_items:
+        session.delete(item)
+    session.commit()
+    return {"ok": True}
+
+if os.path.isdir(os.path.join(frontend_dir, "_next")):
+    app.mount("/_next", StaticFiles(directory=os.path.join(frontend_dir, "_next")), name="next")
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    if not os.path.isdir(frontend_dir):
+        return {"message": "Frontend not built yet. Run 'npm run build' in frontend directory."}
+    
+    path = os.path.join(frontend_dir, full_path)
+    if os.path.isfile(path):
+        return FileResponse(path)
+    
+    # Fallback to index.html for SPA routing
+    return FileResponse(os.path.join(frontend_dir, "index.html"))
