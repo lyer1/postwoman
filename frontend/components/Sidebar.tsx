@@ -252,7 +252,7 @@ export default function Sidebar() {
                       />
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between p-1 hover:bg-[#2A2A2A] rounded group/col relative text-gray-300">
+                    <div className="flex items-center justify-between p-1 hover:bg-[#2A2A2A] rounded group relative text-gray-300">
                       <div 
                         className="flex items-center space-x-1 cursor-pointer text-sm flex-1 overflow-hidden"
                         onClick={() => {
@@ -270,7 +270,7 @@ export default function Sidebar() {
                       <div className="relative">
                         <button 
                           onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === `col-${col.id}` ? null : `col-${col.id}`); }}
-                          className="opacity-0 group-hover/col:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
                           data-testid={`col-menu-btn-${col.name}`}
                         >
                           <MoreVertical size={14} />
@@ -368,7 +368,7 @@ export default function Sidebar() {
                       return (
                         <div 
                           key={`req-${req.id}`}
-                          className="group/req flex items-center space-x-2 p-1 hover:bg-[#2A2A2A] rounded cursor-pointer text-sm text-gray-300"
+                          className="group flex items-center space-x-2 p-1 hover:bg-[#2A2A2A] rounded cursor-pointer text-sm text-gray-300"
                           onClick={() => {
                             if (openTab) {
                               useStore.getState().setActiveTab(Object.keys(useStore.getState().tabs).find(k => useStore.getState().tabs[k].saved_id === req.id)!);
@@ -403,7 +403,7 @@ export default function Sidebar() {
                           <div className="relative">
                             <button 
                               onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === `req-${req.id}` ? null : `req-${req.id}`); }}
-                              className="opacity-0 group-hover/req:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
+                              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
                             >
                               <MoreVertical size={14} />
                             </button>
