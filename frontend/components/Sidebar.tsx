@@ -447,7 +447,54 @@ export default function Sidebar() {
             filteredHist.map(item => (
               <div key={item.id} 
                 className="flex items-center space-x-2 p-1.5 hover:bg-[#2A2A2A] rounded cursor-pointer text-sm text-gray-300"
-                onClick={() => addTab(`hist-${item.id}`, JSON.parse(item.request_data))}
+                onClick={() => {
+                  try {
+                    const data = JSON.parse(item.request_data);
+                    
+                    const headersArr = Object.entries(data.headers || {}).map(([k, v]) => ({
+                      id: Math.random().toString(36).substr(2, 9),
+                      key: k,
+                      value: String(v),
+                      enabled: true
+                    }));
+                    
+                    const paramsArr = Object.entries(data.params || {}).map(([k, v]) => ({
+                      id: Math.random().toString(36).substr(2, 9),
+                      key: k,
+                      value: String(v),
+                      enabled: true
+                    }));
+                    
+                    let bodyRaw = '';
+                    let bodyForm: any[] = [];
+                    if (data.body_type === 'raw' || data.body_type === 'json') {
+                      bodyRaw = typeof data.body === 'string' ? data.body : JSON.stringify(data.body, null, 2);
+                    } else if (data.body_type === 'urlencoded' || data.body_type === 'formdata') {
+                      bodyForm = Object.entries(data.body || {}).map(([k, v]) => ({
+                        id: Math.random().toString(36).substr(2, 9),
+                        key: k,
+                        value: String(v),
+                        enabled: true
+                      }));
+                    }
+                    
+                    addTab(`hist-${item.id}`, {
+                      method: data.method,
+                      url: data.url,
+                      headers: headersArr,
+                      params: paramsArr,
+                      bodyType: data.body_type === 'json' ? 'raw' : (data.body_type || 'none'),
+                      bodyRaw,
+                      bodyForm,
+                      authType: data.auth_type || 'none',
+                      authData: data.auth_data || {},
+                      preRequestScript: data.pre_request_script || '',
+                      postResponseScript: data.post_response_script || ''
+                    });
+                  } catch (err) {
+                    console.error("Failed to parse history data", err);
+                  }
+                }}
               >
                 <span className={clsx("text-[10px] font-bold w-8 flex-shrink-0", 
                   item.method === 'GET' ? 'text-green-500' :
