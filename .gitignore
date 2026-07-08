@@ -3,7 +3,6 @@ backend/venv/
 backend/__pycache__/
 *.pyc
 .env
-postwoman.db
 
 # Playwright
 test-results/
