@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { parseCurl } from '../utils/curlParser';
 import { exportToPostman } from '../utils/postmanExport';
+import { importPostmanCollection } from '../utils/postmanImport';
 import { useStore } from '../store/useStore';
 import { Search, Folder, MoreVertical, Plus, ChevronRight, Check } from 'lucide-react';
 import clsx from 'clsx';
@@ -12,7 +13,7 @@ export default function Sidebar() {
   const { collections, setCollections, history, addTab, tabs, environments, setEnvironments, activeEnvironmentId, setActiveEnvironmentId, activeSidebarTab } = useStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newColName, setNewColName] = useState('');
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingColId, setEditingColId] = useState<number | null>(null);
   const [editColName, setEditColName] = useState('');
   
@@ -21,6 +22,30 @@ export default function Sidebar() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const content = evt.target?.result as string;
+        await importPostmanCollection(content, async () => {
+          const data = await fetch('http://127.0.0.1:8000/api/collections').then(r => r.json());
+          setCollections(data);
+        });
+      } catch (err: any) {
+        alert(err.message);
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleCreateCollection = async () => {
     if (!newColName) return;
@@ -48,6 +73,21 @@ export default function Sidebar() {
       if (res.ok) {
         const data = await fetch('http://127.0.0.1:8000/api/collections').then(r => r.json());
         setCollections(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteRequest = async (reqId: number) => {
+    if (!window.confirm("Are you sure you want to delete this request?")) return;
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/requests/${reqId}`, { method: 'DELETE' });
+      if (res.ok) {
+        const data = await fetch('http://127.0.0.1:8000/api/collections').then(r => r.json());
+        setCollections(data);
+        const tabId = Object.keys(useStore.getState().tabs).find(k => useStore.getState().tabs[k].saved_id === reqId);
+        if (tabId) useStore.getState().removeTab(tabId);
       }
     } catch (e) {
       console.error(e);
@@ -115,15 +155,31 @@ export default function Sidebar() {
       const filteredCols = collections.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
       return (
         <div>
+          <div className="flex space-x-2 px-2 pb-2 mb-1 border-b border-[#2A2A2A]">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 bg-[#FF6C37] hover:bg-[#e05b2c] text-white text-[11px] py-1 rounded font-medium transition-colors"
+            >
+              Import Collection
+            </button>
+            <button 
+              onClick={() => setShowCurlModal(true)}
+              className="flex-1 bg-[#2A2A2A] hover:bg-[#333333] text-white text-[11px] py-1 rounded font-medium transition-colors"
+            >
+              Import cURL
+            </button>
+            <input 
+              type="file" 
+              accept="application/json" 
+              ref={fileInputRef} 
+              className="hidden" 
+              onChange={handleImportJson} 
+            />
+          </div>
+          
           <div className="flex items-center justify-between px-2 py-1 mb-2 group">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">My Workspace</span>
             <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button 
-                onClick={() => setShowCurlModal(true)}
-                className="bg-[#FF6C37] text-white text-[10px] px-2 py-0.5 rounded"
-              >
-                Import cURL
-              </button>
               <button 
                 onClick={() => setShowAddModal(true)} 
                 className="text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
@@ -213,14 +269,16 @@ export default function Sidebar() {
                       </div>
                       <div className="relative">
                         <button 
-                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === col.id ? null : col.id); }}
+                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === `col-${col.id}` ? null : `col-${col.id}`); }}
                           className="opacity-0 group-hover/col:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
                           data-testid={`col-menu-btn-${col.name}`}
                         >
                           <MoreVertical size={14} />
                         </button>
-                        {openMenuId === col.id && (
-                          <div className="absolute right-0 mt-1 w-32 bg-[#2A2A2A] border border-[#333333] shadow-lg z-50 rounded text-left text-xs py-1 text-white">
+                        {openMenuId === `col-${col.id}` && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} />
+                            <div className="absolute right-0 mt-1 w-32 bg-[#2A2A2A] border border-[#333333] shadow-lg z-50 rounded text-left text-xs py-1 text-white">
                             <div className="px-3 py-1.5 hover:bg-[#353535] cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditingColId(col.id); setEditColName(col.name); setOpenMenuId(null); }}>Rename</div>
                             <div className="px-3 py-1.5 hover:bg-[#353535] cursor-pointer" onClick={async (e) => { 
                               e.stopPropagation(); 
@@ -281,7 +339,9 @@ export default function Sidebar() {
                                     bodyType: newReq.body_type,
                                     body: newReq.body,
                                     authType: newReq.auth_type,
-                                    authData: {}
+                                    authData: {},
+                                    preRequestScript: newReq.pre_request_script,
+                                    postResponseScript: newReq.post_response_script
                                   };
                                   addTab(`req-${newReq.id}`, initialData);
                                 }
@@ -294,6 +354,7 @@ export default function Sidebar() {
                             }}>Export</div>
                             <div className="px-3 py-1.5 hover:bg-red-900/50 text-red-400 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleDeleteCollection(col.id); setOpenMenuId(null); }} data-testid={`delete-collection-${col.name}`}>Delete</div>
                           </div>
+                          </>
                         )}
                       </div>
                     </div>
@@ -307,7 +368,7 @@ export default function Sidebar() {
                       return (
                         <div 
                           key={`req-${req.id}`}
-                          className="flex items-center space-x-2 p-1 hover:bg-[#2A2A2A] rounded cursor-pointer text-sm text-gray-300"
+                          className="group/req flex items-center space-x-2 p-1 hover:bg-[#2A2A2A] rounded cursor-pointer text-sm text-gray-300"
                           onClick={() => {
                             if (openTab) {
                               useStore.getState().setActiveTab(Object.keys(useStore.getState().tabs).find(k => useStore.getState().tabs[k].saved_id === req.id)!);
@@ -323,7 +384,9 @@ export default function Sidebar() {
                                 bodyType: req.body_type,
                                 body: req.body,
                                 authType: req.auth_type,
-                                authData: JSON.parse(req.auth_data || '{}')
+                                authData: JSON.parse(req.auth_data || '{}'),
+                                preRequestScript: req.pre_request_script || '',
+                                postResponseScript: req.post_response_script || ''
                               });
                             }
                           }}
@@ -336,7 +399,23 @@ export default function Sidebar() {
                           )}>
                             {displayMethod}
                           </span>
-                          <span className="truncate text-xs">{displayName}</span>
+                          <span className="truncate text-xs flex-1">{displayName}</span>
+                          <div className="relative">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === `req-${req.id}` ? null : `req-${req.id}`); }}
+                              className="opacity-0 group-hover/req:opacity-100 text-gray-400 hover:text-white p-0.5 rounded hover:bg-[#333333]"
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                            {openMenuId === `req-${req.id}` && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} />
+                                <div className="absolute right-0 mt-1 w-32 bg-[#2A2A2A] border border-[#333333] shadow-lg z-50 rounded text-left text-xs py-1 text-white">
+                                  <div className="px-3 py-1.5 hover:bg-red-900/50 text-red-400 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleDeleteRequest(req.id); setOpenMenuId(null); }}>Delete</div>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

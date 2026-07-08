@@ -33,7 +33,7 @@ export default function KeyValTable({ items, onChange }: KeyValTableProps) {
                 />
               </td>
               <td className="p-0 border-r border-[#333333]">
-                <input type="text" className="w-full p-1.5 bg-transparent outline-none font-[JetBrains_Mono] text-xs text-white" placeholder="Key" value={item.key}
+                <input type="text" className="w-full p-1.5 bg-transparent outline-none text-sm text-white placeholder-gray-500" placeholder="Key" value={item.key}
                   onChange={e => {
                     const newItems = [...items];
                     newItems[idx].key = e.target.value;
@@ -42,7 +42,7 @@ export default function KeyValTable({ items, onChange }: KeyValTableProps) {
                 />
               </td>
               <td className="p-0 border-r border-[#333333]">
-                <input type="text" className="w-full p-1.5 bg-transparent outline-none font-[JetBrains_Mono] text-xs text-white" placeholder="Value" value={item.value}
+                <input type="text" className="w-full p-1.5 bg-transparent outline-none text-sm text-white placeholder-gray-500" placeholder="Value" value={item.value}
                   onChange={e => {
                     const newItems = [...items];
                     newItems[idx].value = e.target.value;

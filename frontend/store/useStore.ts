@@ -24,6 +24,8 @@ export interface RequestState {
   loading: boolean;
   authType: 'none' | 'basic' | 'bearer';
   authData: Record<string, string>;
+  preRequestScript?: string;
+  postResponseScript?: string;
 }
 
 interface AppState {
@@ -59,7 +61,9 @@ const defaultRequestState: RequestState = {
   response: null,
   loading: false,
   authType: 'none',
-  authData: {}
+  authData: {},
+  preRequestScript: '',
+  postResponseScript: ''
 };
 
 export const useStore = create<AppState>((set) => ({

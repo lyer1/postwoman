@@ -1,6 +1,6 @@
 'use client';
 import { useStore, KeyVal } from '../store/useStore';
-import { Play, Plus, Trash2, Save, ChevronDown, Code, Wand2 } from 'lucide-react';
+import { Play, Plus, Trash2, Save, ChevronDown, Code, Wand2, Check } from 'lucide-react';
 import clsx from 'clsx';
 import KeyValTable from './KeyValTable';
 import { useState, useMemo } from 'react';
@@ -9,19 +9,28 @@ import { parseCurl } from '../utils/curlParser';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-javascript';
 import 'prismjs/themes/prism-twilight.css';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 
 export default function RequestPane() {
   const { tabs, activeTabId, updateTab, environments, activeEnvironmentId, setActiveEnvironmentId, collections, setCollections } = useStore();
-  const [innerTab, setInnerTab] = useState<'Params' | 'Headers' | 'Body' | 'Auth'>('Params');
+  const [innerTab, setInnerTab] = useState<'Params' | 'Headers' | 'Body' | 'Auth' | 'Scripts'>('Params');
+  const [scriptTab, setScriptTab] = useState<'preReq' | 'postRes'>('preReq');
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveReqName, setSaveReqName] = useState('');
   const [saveCollectionId, setSaveCollectionId] = useState('');
   const [methodDropdownOpen, setMethodDropdownOpen] = useState(false);
+  const [authDropdownOpen, setAuthDropdownOpen] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [codeLang, setCodeLang] = useState<'curl' | 'fetch' | 'python'>('curl');
+  const [showToast, setShowToast] = useState(false);
+  
+  const triggerToast = () => {
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
   
   if (!activeTabId || !tabs[activeTabId]) return <div className="h-full flex items-center justify-center text-gray-500">No active request</div>;
   
@@ -49,7 +58,74 @@ export default function RequestPane() {
     };
 
     try {
-      // Create dicts from key-value arrays with resolved values
+      let envMap: Record<string, string> = {};
+      envVars.forEach(v => {
+        if (v.key && v.enabled) envMap[v.key] = v.value;
+      });
+
+      let testResults: any[] = [];
+      let envModified = false;
+
+      const pw = {
+        env: {
+          get: (key: string) => envMap[key],
+          set: (key: string, value: string) => { 
+            envMap[key] = value; 
+            envModified = true;
+            const existing = envVars.find(v => v.key === key);
+            if (existing) { existing.value = value; existing.enabled = true; }
+            else { envVars.push({ key, value, enabled: true, id: Date.now().toString() }); }
+          }
+        },
+        request: { url: currentReq.url, method: currentReq.method, headers: currentReq.headers },
+        response: undefined as any,
+        test: (name: string, fn: Function) => {
+          try {
+            fn();
+            testResults.push({ name, pass: true });
+          } catch (err: any) {
+            testResults.push({ name, pass: false, error: err.message });
+          }
+        },
+        expect: (val: any) => {
+          const expectation = {
+            toBe: (expected: any) => { if (val !== expected) throw new Error(`Expected ${expected}, got ${val}`); },
+            toEqual: (expected: any) => { if (JSON.stringify(val) !== JSON.stringify(expected)) throw new Error(`Expected ${expected}, got ${val}`); },
+            eql: (expected: any) => { if (JSON.stringify(val) !== JSON.stringify(expected)) throw new Error(`Expected ${expected}, got ${val}`); },
+            equal: (expected: any) => { if (val !== expected) throw new Error(`Expected ${expected}, got ${val}`); }
+          };
+          (expectation as any).to = expectation;
+          (expectation as any).be = expectation;
+          return expectation;
+        }
+      };
+
+      if (currentReq.preRequestScript) {
+        try {
+          const fn = new Function('pw', currentReq.preRequestScript);
+          fn(pw);
+        } catch (err) {
+          console.error('Pre-req script error:', err);
+        }
+      }
+
+      // Sync environment changes to backend if there's an active environment
+      if (envModified && activeEnv) {
+        await fetch(`http://127.0.0.1:8000/api/environments/${activeEnv.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: activeEnv.name,
+            variables: JSON.stringify(envVars)
+          })
+        });
+        const envsRes = await fetch('http://127.0.0.1:8000/api/environments');
+        if (envsRes.ok) {
+          useStore.getState().setEnvironments(await envsRes.json());
+        }
+      }
+
+      // Re-create dicts from key-value arrays with re-resolved values
       const headers = currentReq.headers.filter(h => h.enabled && h.key).reduce((acc, h) => ({...acc, [resolveVars(h.key)]: resolveVars(h.value)}), {} as Record<string, string>);
       
       if (currentReq.authType === 'basic') {
@@ -86,6 +162,39 @@ export default function RequestPane() {
       if (!res.ok) {
         throw new Error(data.detail || `HTTP Error ${res.status}`);
       }
+
+      // Post-response scripts
+      pw.response = {
+        ...data,
+        json: () => {
+          if (typeof data.body === 'string') return JSON.parse(data.body);
+          return data.body;
+        }
+      };
+      if (currentReq.postResponseScript) {
+        try {
+          envModified = false;
+          const fn = new Function('pw', currentReq.postResponseScript);
+          fn(pw);
+          
+          if (envModified && activeEnv) {
+            await fetch(`http://127.0.0.1:8000/api/environments/${activeEnv.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: activeEnv.name,
+                variables: JSON.stringify(envVars)
+              })
+            });
+            const envsRes = await fetch('http://127.0.0.1:8000/api/environments');
+            if (envsRes.ok) useStore.getState().setEnvironments(await envsRes.json());
+          }
+        } catch (err) {
+          console.error('Post-res script error:', err);
+        }
+      }
+
+      data.testResults = testResults;
       updateTab(activeTabId, { loading: false, response: data });
     } catch (e: any) {
       updateTab(activeTabId, { loading: false, response: { error: e.message }});
@@ -109,12 +218,15 @@ export default function RequestPane() {
             body_type: currentReq.bodyType,
             body: currentReq.bodyType === 'raw' ? currentReq.bodyRaw : JSON.stringify(currentReq.bodyForm),
             auth_type: currentReq.authType,
-            auth_data: JSON.stringify(currentReq.authData)
+            auth_data: JSON.stringify(currentReq.authData),
+            pre_request_script: currentReq.preRequestScript || '',
+            post_response_script: currentReq.postResponseScript || ''
           })
         });
         if (res.ok) {
           const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
           setCollections(await colsRes.json());
+          triggerToast();
         }
       } catch (e) { console.error(e); }
     } else if (currentReq.collection_id) {
@@ -132,7 +244,9 @@ export default function RequestPane() {
             body_type: currentReq.bodyType,
             body: currentReq.bodyType === 'raw' ? currentReq.bodyRaw : JSON.stringify(currentReq.bodyForm),
             auth_type: currentReq.authType,
-            auth_data: JSON.stringify(currentReq.authData)
+            auth_data: JSON.stringify(currentReq.authData),
+            pre_request_script: currentReq.preRequestScript || '',
+            post_response_script: currentReq.postResponseScript || ''
           })
         });
         if (res.ok) {
@@ -140,6 +254,7 @@ export default function RequestPane() {
           updateTab(activeTabId, { saved_id: data.id });
           const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
           setCollections(await colsRes.json());
+          triggerToast();
         }
       } catch (e) { console.error(e); }
     } else {
@@ -166,7 +281,9 @@ export default function RequestPane() {
           body_type: currentReq.bodyType,
           body: currentReq.bodyType === 'raw' ? currentReq.bodyRaw : JSON.stringify(currentReq.bodyForm),
           auth_type: currentReq.authType,
-          auth_data: JSON.stringify(currentReq.authData)
+          auth_data: JSON.stringify(currentReq.authData),
+          pre_request_script: currentReq.preRequestScript || '',
+          post_response_script: currentReq.postResponseScript || ''
         })
       });
       if (res.ok) {
@@ -175,6 +292,7 @@ export default function RequestPane() {
         setShowSaveModal(false);
         const colsRes = await fetch('http://127.0.0.1:8000/api/collections');
         setCollections(await colsRes.json());
+        triggerToast();
       }
     } catch (e) {
       console.error(e);
@@ -229,7 +347,7 @@ export default function RequestPane() {
           </div>
           <input 
             type="text" 
-            placeholder="Enter request URL" 
+            placeholder="Enter request URL or paste cURL" 
             className="flex-1 bg-transparent text-white px-3 py-0 h-full text-sm outline-none"
             value={req.url}
             onChange={(e) => updateTab(activeTabId, { url: e.target.value })}
@@ -364,7 +482,7 @@ export default function RequestPane() {
       )}
 
       <div className="flex space-x-6 border-b border-[#333333] mb-4 text-sm font-semibold">
-        {['Params', 'Headers', 'Body', 'Auth'].map(tab => (
+        {['Params', 'Headers', 'Body', 'Auth', 'Scripts'].map(tab => (
           <button 
             key={tab}
             onClick={() => setInnerTab(tab as any)}
@@ -438,17 +556,43 @@ export default function RequestPane() {
         )}
         {innerTab === 'Auth' && (
           <div className="flex flex-col h-full">
-            <div className="flex space-x-4 mb-4 text-sm text-gray-400">
-              <select 
-                className="bg-[#1a1a1a] border border-[#333333] hover:bg-[#2A2A2A] text-white px-3 py-1 rounded text-sm outline-none cursor-pointer"
-                value={req.authType || 'none'}
-                onChange={(e) => updateTab(activeTabId, { authType: e.target.value as any })}
+            <div className="relative mb-4 w-48">
+              <div 
+                className="flex items-center justify-between bg-[#131313] border border-[#333333] hover:bg-[#2A2A2A] text-white px-3 py-1.5 rounded text-sm cursor-pointer select-none"
+                onClick={() => setAuthDropdownOpen(!authDropdownOpen)}
                 data-testid="auth-type-select"
               >
-                <option value="none">No Auth</option>
-                <option value="basic">Basic Auth</option>
-                <option value="bearer">Bearer Token</option>
-              </select>
+                <span>
+                  {req.authType === 'basic' ? 'Basic Auth' : req.authType === 'bearer' ? 'Bearer Token' : 'No Auth'}
+                </span>
+                <ChevronDown size={14} className="text-gray-400" />
+              </div>
+              {authDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setAuthDropdownOpen(false)} />
+                  <div className="absolute top-full left-0 mt-1 w-full bg-[#1C1C1C] border border-[#333333] rounded shadow-lg z-20 py-1">
+                  {[
+                    { val: 'none', label: 'No Auth' },
+                    { val: 'basic', label: 'Basic Auth' },
+                    { val: 'bearer', label: 'Bearer Token' }
+                  ].map(opt => (
+                    <div
+                      key={opt.val}
+                      className={clsx(
+                        "px-3 py-1.5 text-sm cursor-pointer select-none hover:bg-[#2A2A2A]",
+                        req.authType === opt.val ? "text-[#FF6C37] font-semibold" : "text-gray-300"
+                      )}
+                      onClick={() => {
+                        updateTab(activeTabId, { authType: opt.val as any });
+                        setAuthDropdownOpen(false);
+                      }}
+                    >
+                      {opt.label}
+                    </div>
+                  ))}
+                </div>
+                </>
+              )}
             </div>
             
             {req.authType === 'basic' && (
@@ -490,7 +634,49 @@ export default function RequestPane() {
             )}
           </div>
         )}
+        {innerTab === 'Scripts' && (
+          <div className="flex h-full">
+            <div className="w-32 flex flex-col space-y-1 border-r border-[#333333] pr-4 mr-4">
+              <button 
+                onClick={() => setScriptTab('preReq')}
+                className={clsx("text-left text-sm py-1.5 px-2 rounded", scriptTab === 'preReq' ? 'bg-[#333333] text-white' : 'text-gray-400 hover:text-white')}
+              >
+                Pre-req
+              </button>
+              <button 
+                onClick={() => setScriptTab('postRes')}
+                className={clsx("text-left text-sm py-1.5 px-2 rounded", scriptTab === 'postRes' ? 'bg-[#333333] text-white' : 'text-gray-400 hover:text-white')}
+              >
+                Post-res
+              </button>
+            </div>
+            <div className="flex-1 h-64 bg-[#131313] border border-[#333333] rounded overflow-auto relative">
+              <Editor
+                value={scriptTab === 'preReq' ? (req.preRequestScript || '') : (req.postResponseScript || '')}
+                onValueChange={code => updateTab(activeTabId, scriptTab === 'preReq' ? { preRequestScript: code } : { postResponseScript: code })}
+                highlight={code => Prism.highlight(code, Prism.languages.javascript, 'javascript')}
+                padding={10}
+                style={{
+                  fontFamily: '"JetBrains Mono", monospace',
+                  fontSize: 12,
+                  minHeight: '100%',
+                }}
+                className="outline-none min-h-full"
+                textareaClassName="focus:outline-none min-h-full"
+                placeholder={scriptTab === 'preReq' ? "// Write pre-request scripts here\n// Use pw.env.set('key', 'value') to update environments" : "// Write tests and post-response scripts here\n// pw.test('Status is 200', () => { pw.expect(pw.response.status).toBe(200); });"}
+              />
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed bottom-6 right-6 bg-[#2A2A2A] border border-[#333333] text-green-400 px-4 py-2 rounded shadow-xl text-sm font-medium flex items-center space-x-2 z-50">
+          <Check size={16} />
+          <span>Request saved successfully</span>
+        </div>
+      )}
     </div>
   );
 }

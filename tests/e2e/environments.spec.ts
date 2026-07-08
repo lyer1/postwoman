@@ -44,7 +44,7 @@ test.describe('Environment variables in request bodies', () => {
     await page.locator('select').filter({ hasText: 'No Environment' }).selectOption({ label: envName });
 
     // 10. Set URL and Method
-    await page.getByPlaceholder('Enter request URL').fill('{{url}}/post');
+    await page.getByPlaceholder('Enter request URL or paste cURL').fill('{{url}}/post');
     const methodSelector = page.getByTestId('method-dropdown-trigger');
     await methodSelector.click();
     await page.getByTestId('method-option-POST').click();
@@ -65,9 +65,9 @@ test.describe('Environment variables in request bodies', () => {
     // "json": { "my_var": "hello_world" }
     await page.waitForTimeout(1000);
     await page.screenshot({ path: 'debug_screenshot.png' });
-    const preText = await page.locator('pre').innerText();
+    const preText = await page.locator('pre').last().innerText();
     console.log('PRE TEXT:', preText);
-    await expect(page.locator('pre')).toContainText('"my_var": "hello_world"');
+    await expect(page.locator('pre').last()).toContainText('"my_var": "hello_world"');
 
     // 12. Test FormData Body
     await page.locator('label', { hasText: 'formdata' }).click();
@@ -88,7 +88,7 @@ test.describe('Environment variables in request bodies', () => {
 
     // In httpbin.org/post, the response JSON contains 'form' field
     // "form": { "form_var": "hello_world" }
-    await expect(page.locator('pre')).toContainText('"form_var": "hello_world"');
+    await expect(page.locator('pre').last()).toContainText('"form_var": "hello_world"');
 
     // 13. Cleanup
     await page.getByTitle('Environments').click();

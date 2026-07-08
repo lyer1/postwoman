@@ -114,7 +114,40 @@ export default function ResponsePane() {
         </div>
       )}
 
-      {tab !== 'Body' && tab !== 'Headers' && (
+      {tab === 'Test Results' && (
+        <div className="flex-1 overflow-y-auto mt-2">
+          {req.response.testResults && req.response.testResults.length > 0 ? (
+            <div className="flex flex-col space-y-2 text-sm">
+              <div className="font-semibold text-gray-300 mb-2">
+                Test Results ({req.response.testResults.filter((t: any) => t.pass).length}/{req.response.testResults.length} passed)
+              </div>
+              {req.response.testResults.map((tr: any, idx: number) => (
+                <div key={idx} className="flex flex-col bg-[#131313] p-3 rounded border border-[#333333]">
+                  <div className="flex items-center space-x-2">
+                    {tr.pass ? (
+                      <span className="bg-green-500/20 text-green-500 px-2 py-0.5 rounded text-xs font-bold">PASS</span>
+                    ) : (
+                      <span className="bg-red-500/20 text-red-500 px-2 py-0.5 rounded text-xs font-bold">FAIL</span>
+                    )}
+                    <span className="text-gray-300 font-medium">{tr.name}</span>
+                  </div>
+                  {!tr.pass && tr.error && (
+                    <div className="text-red-400 text-xs mt-2 font-mono break-words whitespace-pre-wrap">
+                      {tr.error}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 h-full flex items-center justify-center text-gray-500 text-sm">
+              No test results found.
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab !== 'Body' && tab !== 'Headers' && tab !== 'Test Results' && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
           {tab} (Coming Soon)
         </div>

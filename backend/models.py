@@ -42,6 +42,8 @@ class SavedRequest(SQLModel, table=True):
     body: str = Field(default="")
     auth_type: str = Field(default="none")
     auth_data: str = Field(default="{}")
+    pre_request_script: str = Field(default="")
+    post_response_script: str = Field(default="")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

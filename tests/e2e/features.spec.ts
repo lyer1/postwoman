@@ -20,7 +20,7 @@ test.describe('New Features', () => {
     await expect(methodDropdownText).toHaveText('POST');
     
     // Verify URL
-    const urlInput = page.locator('input[placeholder="Enter request URL"]');
+    const urlInput = page.locator('input[placeholder="Enter request URL or paste cURL"]');
     await expect(urlInput).toHaveValue('https://httpbin.org/post');
     
     // Switch to body tab
@@ -30,12 +30,12 @@ test.describe('New Features', () => {
 
   test('Pasting cURL in URL bar works', async ({ page }) => {
     await page.getByTestId('add-tab-btn').click();
-    const urlInput = page.locator('input[placeholder="Enter request URL"]');
+    const urlInput = page.locator('input[placeholder="Enter request URL or paste cURL"]');
     
     // Simulate paste event
     await urlInput.focus();
     await page.evaluate(() => {
-      const input = document.querySelector('input[placeholder="Enter request URL"]');
+      const input = document.querySelector('input[placeholder="Enter request URL or paste cURL"]');
       if (input) {
         const dt = new DataTransfer();
         dt.setData('text/plain', 'curl -X PUT https://httpbin.org/put -H "x-test: 123"');
@@ -60,7 +60,7 @@ test.describe('New Features', () => {
   test('Code snippet generation works', async ({ page }) => {
     // Fill basic request
     await page.getByTestId('add-tab-btn').click();
-    const urlInput = page.locator('input[placeholder="Enter request URL"]');
+    const urlInput = page.locator('input[placeholder="Enter request URL or paste cURL"]');
     await urlInput.fill('https://httpbin.org/get');
 
     // Open Code modal
@@ -103,14 +103,15 @@ test.describe('New Features', () => {
 
   test('Auth Tab - Basic and Bearer Token works', async ({ page }) => {
     await page.getByTestId('add-tab-btn').click();
-    const urlInput = page.locator('input[placeholder="Enter request URL"]');
+    const urlInput = page.locator('input[placeholder="Enter request URL or paste cURL"]');
     await urlInput.fill('https://httpbin.org/get');
 
     // Go to Auth tab
     await page.click('button:has-text("Auth")');
 
     // Select Basic Auth
-    await page.getByTestId('auth-type-select').selectOption('basic');
+    await page.getByTestId('auth-type-select').click();
+    await page.locator('text=Basic Auth').first().click();
     await page.getByTestId('auth-basic-username').fill('testuser');
     await page.getByTestId('auth-basic-password').fill('testpass');
 
@@ -128,7 +129,8 @@ test.describe('New Features', () => {
     await page.click('button:has-text("Close")');
 
     // Select Bearer Token
-    await page.getByTestId('auth-type-select').selectOption('bearer');
+    await page.getByTestId('auth-type-select').click();
+    await page.locator('text=Bearer Token').first().click();
     await page.getByTestId('auth-bearer-token').fill('my-super-secret-token');
 
     // Send Request
@@ -136,6 +138,61 @@ test.describe('New Features', () => {
 
     await expect(page.locator('text=Status:')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('pre')).toContainText('"Authorization": "Bearer my-super-secret-token"');
+  });
+
+  test('Scripts - Pre-req and Post-res work correctly', async ({ page }) => {
+    await page.getByTestId('add-tab-btn').click();
+    const urlInput = page.locator('input[placeholder="Enter request URL or paste cURL"]');
+    await urlInput.fill('https://httpbin.org/get');
+
+    // Go to Scripts tab
+    await page.click('button:has-text("Scripts")');
+
+    // Pre-req Script: Set env variable
+    await page.click('button:has-text("Pre-req")');
+    const editorTextarea = page.locator('textarea').last();
+    await editorTextarea.fill("pw.env.set('my_dynamic_var', 'scripted_value');");
+
+    // Add query param using this var
+    await page.click('button:has-text("Params")');
+    await page.click('button:has-text("Add Item")');
+    const paramKey = page.locator('tbody tr').nth(0).locator('td').nth(1).locator('input');
+    const paramVal = page.locator('tbody tr').nth(0).locator('td').nth(2).locator('input');
+    await paramKey.fill('custom_param');
+    await paramVal.fill('{{my_dynamic_var}}');
+
+    // Go back to scripts, switch to Post-res
+    await page.click('button:has-text("Scripts")');
+    await page.click('button:has-text("Post-res")');
+    
+    // Post-res Script: Run a test
+    await editorTextarea.fill(`
+pw.test("Status code is 200", () => {
+  pw.expect(pw.response.status).toBe(200);
+});
+pw.test("Test that fails", () => {
+  pw.expect(pw.response.status).toBe(500);
+});
+`);
+
+    // Send Request
+    await page.click('button:has-text("Send")');
+    await expect(page.locator('text=Status:')).toBeVisible({ timeout: 15000 });
+
+    // Verify the URL param was resolved to 'scripted_value'
+    await page.click('button:has-text("Body")');
+    await expect(page.locator('pre')).toContainText('"custom_param": "scripted_value"');
+
+    // Verify Test Results
+    await page.click('button:has-text("Test Results")');
+    
+    // Check passes
+    await expect(page.locator('text=Test Results (1/2 passed)')).toBeVisible();
+    await expect(page.locator('text=Status code is 200')).toBeVisible();
+    
+    // Check failure
+    await expect(page.locator('text=Test that fails')).toBeVisible();
+    await expect(page.locator('text=Expected 500, got 200')).toBeVisible();
   });
 
   test('Nested folders works', async ({ page }) => {
@@ -156,5 +213,82 @@ test.describe('New Features', () => {
     page.on('dialog', dialog => dialog.accept());
     await page.getByTestId(`col-menu-btn-${uniqueColName}`).click();
     await page.getByTestId(`delete-collection-${uniqueColName}`).click();
+  });
+
+  test('JSON Import works', async ({ page }) => {
+    const uniqueSuffix = Date.now().toString();
+    const colName = `Imported JSON ${uniqueSuffix}`;
+    const folderName = `Imported Folder ${uniqueSuffix}`;
+    const reqName = `Imported Request ${uniqueSuffix}`;
+    
+    // Create a mock postman collection json
+    const mockCollection = {
+      info: {
+        name: colName,
+        schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+      },
+      item: [
+        {
+          name: folderName,
+          item: [
+            {
+              name: reqName,
+              request: {
+                method: "POST",
+                header: [
+                  { key: "Content-Type", value: "application/json" }
+                ],
+                url: {
+                  raw: "https://httpbin.org/post",
+                  protocol: "https",
+                  host: ["httpbin", "org"],
+                  path: ["post"]
+                },
+                body: {
+                  mode: "raw",
+                  raw: "{\"key\": \"value\"}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    const fs = require('fs');
+    const path = require('path');
+    const tempFilePath = path.join(__dirname, 'temp_mock_collection.json');
+    fs.writeFileSync(tempFilePath, JSON.stringify(mockCollection));
+
+    // Wait for the UI
+    await page.waitForSelector('text=My Workspace');
+    
+    // Set file to input
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page.click('button:has-text("Import Collection")');
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(tempFilePath);
+
+    // Wait for import to complete and collection to appear
+    await expect(page.locator(`text=${colName}`).first()).toBeVisible({ timeout: 10000 });
+
+    // Expand imported collection
+    await page.locator(`text=${colName}`).first().click();
+    await expect(page.locator(`text=${folderName}`).first()).toBeVisible();
+
+    // Expand folder
+    await page.locator(`text=${folderName}`).first().click();
+    await expect(page.locator(`text=${reqName}`).first()).toBeVisible();
+
+    // Open imported request
+    await page.locator(`text=${reqName}`).first().click();
+    
+    // Check request details
+    await expect(page.getByTestId('method-dropdown-trigger-text')).toHaveText('POST');
+    const urlInput = page.locator('input[placeholder="Enter request URL or paste cURL"]');
+    await expect(urlInput).toHaveValue('https://httpbin.org/post');
+
+    // Cleanup
+    fs.unlinkSync(tempFilePath);
   });
 });

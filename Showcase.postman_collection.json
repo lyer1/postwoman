@@ -1,0 +1,122 @@
+{
+  "info": {
+    "name": "Postwoman Showcase",
+    "description": "A collection showcasing all features: scripts, auth, params, forms, bodies, and env variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Comprehensive Example",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pw.env.set('my_dynamic_var', 'HelloWorld123');",
+              "console.log('Pre-request script executed! Variable set.');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pw.test('Status code is 200', () => {",
+              "    pw.expect(pw.response.status).toBe(200);",
+              "});",
+              "pw.test('Response has correct URL', () => {",
+              "    const body = JSON.parse(pw.response.body);",
+              "    pw.expect(body.url).toContain('httpbin.org');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "supersecrettoken123",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"message\": \"{{my_dynamic_var}}\",\n    \"extra\": \"This uses a variable set in the pre-request script!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://httpbin.org/post?q=searchterm",
+          "protocol": "https",
+          "host": [
+            "httpbin",
+            "org"
+          ],
+          "path": [
+            "post"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "searchterm"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Auth Example",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "user",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "passwd",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://httpbin.org/basic-auth/user/passwd",
+          "protocol": "https",
+          "host": [
+            "httpbin",
+            "org"
+          ],
+          "path": [
+            "basic-auth",
+            "user",
+            "passwd"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

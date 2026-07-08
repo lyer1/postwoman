@@ -8,7 +8,7 @@ test('has title and collections loaded', async ({ page }) => {
 
 test('can send request and receive response', async ({ page }) => {
   await page.goto('/');
-  const urlInput = page.getByPlaceholder('Enter request URL');
+  const urlInput = page.getByPlaceholder('Enter request URL or paste cURL');
   await urlInput.fill('https://httpbin.org/get');
   const sendButton = page.locator('button:has-text("Send")');
   await sendButton.click();
@@ -22,7 +22,7 @@ test('full collection workflow - add collection, save request, reload, delete co
   const reqName2 = `My Seamless Request ${Date.now()}`;
   
   // 1. Add Collection
-  await page.getByTestId('add-collection-btn').click();
+  await page.getByTestId('add-collection-btn').first().click();
   const colInput = page.getByTestId('add-collection-input');
   await colInput.fill(colName);
   await page.getByTestId('save-collection-btn').click();
@@ -32,7 +32,7 @@ test('full collection workflow - add collection, save request, reload, delete co
   await expect(collectionFolder).toBeVisible();
 
   // 2. Configure a new request and send it
-  const urlInput = page.getByPlaceholder('Enter request URL');
+  const urlInput = page.getByPlaceholder('Enter request URL or paste cURL');
   await urlInput.fill('https://httpbin.org/get');
   const sendButton = page.locator('button:has-text("Send")');
   await sendButton.click();
@@ -82,7 +82,7 @@ test('full collection workflow - add collection, save request, reload, delete co
   await tabInput.press('Enter');
 
   // Fill URL and Seamless Save
-  await page.getByPlaceholder('Enter request URL').fill('https://httpbin.org/uuid');
+  await page.getByPlaceholder('Enter request URL or paste cURL').fill('https://httpbin.org/uuid');
   await page.getByTestId('request-save-btn').click();
   await page.waitForTimeout(1000); // Wait for PUT request to complete
   // It shouldn't open a popup, so we verify by reloading and checking if it exists

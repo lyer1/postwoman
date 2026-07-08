@@ -24,13 +24,31 @@ export function exportToPostman(collection: any, allCollections: any[]) {
         let params = [];
         try { params = JSON.parse(req.query_params || '[]'); } catch(e) {}
 
+        let protocol = '';
+        let hostArray: string[] = [];
+        let pathArray: string[] = [];
+        let rawUrl = req.url || '';
+        
+        if (rawUrl.includes('://')) {
+          const parts = rawUrl.split('://');
+          protocol = parts[0];
+          const rest = parts[1].split('/');
+          hostArray = rest[0].split('.');
+          pathArray = rest.slice(1);
+        } else {
+          const rest = rawUrl.split('/');
+          hostArray = rest[0].split('.');
+          pathArray = rest.slice(1);
+        }
+
         const postmanReq: any = {
           method: req.method,
           header: headers.filter((h: any) => h.enabled && h.key).map((h: any) => ({ key: h.key, value: h.value })),
           url: {
             raw: req.url,
-            host: req.url.split('/')[2] ? [req.url.split('/')[2]] : [],
-            path: req.url.split('/').slice(3),
+            ...(protocol ? { protocol } : {}),
+            host: hostArray,
+            path: pathArray,
             query: params.filter((p: any) => p.enabled && p.key).map((p: any) => ({ key: p.key, value: p.value }))
           }
         };

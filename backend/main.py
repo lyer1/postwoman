@@ -216,6 +216,8 @@ def update_request(request_id: int, req_data: SavedRequest, session: Session = D
     req.body = req_data.body
     req.auth_type = req_data.auth_type
     req.auth_data = req_data.auth_data
+    req.pre_request_script = req_data.pre_request_script
+    req.post_response_script = req_data.post_response_script
     session.add(req)
     session.commit()
     session.refresh(req)
